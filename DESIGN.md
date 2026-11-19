@@ -1287,7 +1287,7 @@ ps-package-pusher/
 
 16. ~~Offset `entry_count` (0x10) i bit enkripcije u `flags1` (0x80000000)~~ — potvrđeno desk-provjerom (PLAN 3).
 17. Ukupna veličina paketa je `pkg_size` u64 @0x430 (desk-provjera); ostaje potvrditi na stvarnom split paketu da `_0` nosi ukupnu veličinu (PLAN S-6).
-18. Koji SFO ključ nosi verziju za prikaz po kategoriji (`APP_VER` vs `VERSION`).
+18. Koji SFO ključ nosi verziju za prikaz po kategoriji (`APP_VER` vs `VERSION`). Stvarni `gd` paket (S-6): `APP_VER=01.00`, `VERSION=01.01` — prikazuje se `APP_VER`, `VERSION` u tooltipu; potvrditi za `gp`/`ac`.
 19. Kategorije osim `gd/gp/ac` koje se realno pojavljuju (teme, `gde`, `gdk`) i kako ih RPI instalira.
 
 ### 14.3 Za provjeru prototipom (Windows/egui)
