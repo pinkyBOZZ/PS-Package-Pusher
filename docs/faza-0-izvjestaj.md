@@ -6,7 +6,7 @@ Datum: 2026-11-19 · Mašina: dev laptop, Windows 11 (build 26300), AMD Radeon i
 |---|---|---|---|
 | S-1 | Splash → glavni prozor (preobražaj root viewporta) | Radi: 480×300 bez okvira i transparentan → 1100×700 sa okvirom, centrirano (`Transparent(false)`, `Decorations(true)`, `Resizable`, `MinInnerSize`, `InnerSize`, `OuterPosition`). Vlasnik vizuelno potvrdio: OK, bez treperenja. | Preobražaj (ne `show_viewport_deferred`), ako vlasnik ne vidi bljesak |
 | S-1/S-7 | Renderer glow vs wgpu, fps | glow: ~25–27 fps, wgpu: ~30 fps uz stalni repaint na ovoj mašini (ekran 60 Hz). Isto i za transparentan i neprozirni prozor. Uzrok nepoznat (iGPU/frame pacing); **[PROVJERA]** na kućnom računaru. | **glow** (manji exe, razlika u fps zanemariva) |
-| S-2 | Windows tema | `ctx.system_theme()` vraća `Dark` odmah na startu. Promjena teme uživo **nije testirana** (traži promjenu sistemske postavke) — čeka vlasnika. `SPI_GETCLIENTAREAANIMATION` čitanje radi (`true`). | `ThemePreference::System` + rezerva iz DESIGN 9.7 ako živa promjena ne stigne |
+| S-2 | Windows tema | `ctx.system_theme()` vraća `Dark` odmah na startu. Promjena teme uživo: vlasnik potvrdio da prozor reaguje. `SPI_GETCLIENTAREAANIMATION` čitanje radi (`true`). | `ThemePreference::System` + rezerva iz DESIGN 9.7 ako živa promjena ne stigne |
 | S-3 | Repaint u mirovanju | **0 frame-ova** nakon završetka animacije (debug i release). | Potvrđeno, bez izmjena |
 | S-4 | HTTP server | Vlastiti GET/HEAD server nad `std::net` (~150 linija): Range na 5 GB sparse fajlu tačan (prvi i zadnji bajtovi, suffix `-16`), više opsega i opseg van fajla → 416, 404/405, keep-alive (2 zahtjeva = 1 konekcija), prekid klijenta ne ruši server, 40 paralelnih → 32× 206 + 7× 503 + 1× reset, nakon opterećenja radi. Protok ~176 MB/s (loopback). IP filter može tiho zatvoriti konekciju (tiny_http ne može). | **Vlastiti server**, `tiny_http` se izbacuje. Ispraviti: prije 503 pročitati zahtjev da klijent ne dobije reset |
 | S-5 | Firewall prompt i pravilo (9.8) | Nije izvedeno: traži "Allow" i UAC klik vlasnika. Lokalna pravila su dozvoljena na ovoj mašini. | Izvesti zajedno sa vlasnikom |
@@ -41,4 +41,6 @@ Prihvaćeno: glow renderer, vlastiti HTTP server (bez `tiny_http`), egui/eframe 
 
 S-1 splash: vlasnik potvrdio OK. Spike grane obrisane (rezultati u ovom izvještaju).
 
-Otvoreno do zatvaranja CP-0: živa promjena teme (S-2), firewall test (S-5), stvarni pkg fajlovi (S-6).
+S-2 živa promjena teme: vlasnik potvrdio OK.
+
+Otvoreno do zatvaranja CP-0: firewall test (S-5), stvarni pkg fajlovi (S-6).
