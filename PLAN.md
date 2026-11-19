@@ -12,7 +12,7 @@ Veličina zadataka: **S** (mali, jedna cjelina), **M** (nekoliko povezanih dijel
 
 1. **Ništa ne počinje bez izričitog OK-a vlasnika.** Prvi checkpoint je **CP-P: odobrenje ovog plana**. Tek nakon njega se radi Faza 0.
 2. Svaka faza završava **checkpointom (CP-n)**: pokazuje se ono što je navedeno u fazi (demo, screenshotovi, test izvještaj), a vlasnik odobrava (a) rezultat faze i (b) početak sljedeće. Nema automatskog prelaska faza. Paralelni rad dvije faze je moguć samo ako vlasnik izričito odobri obje.
-3. Mehanizam: rad faze ide na granu `faza-N`; checkpoint je pregled Pull Requesta `faza-N → main` (CI zelen + isporuke u opisu PR-a). Merge radi vlasnik ili se radi tek na njegov izričit OK.
+3. Mehanizam (odluka vlasnika 2026-11-19): radi se **direktno na `main`** i pusha na `main`; bez PR-ova i faza-grana. Checkpoint je pregled isporuka i izvještaja faze (`docs/faza-N-izvjestaj.md`) + zelen CI na `main`. Spike kod ostaje na granama `spike/*`.
 4. Akcije koje uvijek traže vlasnika: `git init`, kreiranje GitHub repoa, push tagova, promjena vidljivosti repoa u public, objavljivanje releasea, klik "Allow" na Windows Firewall promptu, sve na konzoli, preuzimanje fajlova (fontovi, alati), izmjene odluka iz DESIGN-a.
 5. Izmjena DESIGN-a tokom izrade: samo kad se nađe greška/kontradikcija ili kad provjera (spike, sesija na konzoli) da novi podatak; svaka izmjena se navodi u PR-u i odobrava na checkpointu.
 6. Opseg je zaključan: sve iz DESIGN 1.1 je v1, DESIGN 1.2 ostaje van v1.
