@@ -181,16 +181,22 @@ fn keep_alive_and_limit() {
     let hold: Vec<TcpStream> = (0..MAX_CONN)
         .map(|_| TcpStream::connect(a).unwrap())
         .collect();
-    std::thread::sleep(Duration::from_millis(300));
-    let (h, _) = get(a, &e.urls[0], Some("bytes=0-3"));
+    // slow CI runners accept the held connections late: poll instead of a fixed sleep
+    let wait_for = |want: &str| {
+        let t0 = std::time::Instant::now();
+        loop {
+            let (h, _) = get(a, &e.urls[0], Some("bytes=0-3"));
+            if h.starts_with(want) || t0.elapsed() > Duration::from_secs(5) {
+                return h;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    };
+    let h = wait_for("HTTP/1.1 503");
     assert!(h.starts_with("HTTP/1.1 503"), "{h}");
     drop(hold);
-    std::thread::sleep(Duration::from_millis(300));
-    assert!(
-        get(a, &e.urls[0], Some("bytes=0-3"))
-            .0
-            .starts_with("HTTP/1.1 206")
-    );
+    let h = wait_for("HTTP/1.1 206");
+    assert!(h.starts_with("HTTP/1.1 206"), "{h}");
     drop(e.server);
     std::fs::remove_dir_all(e.dir).unwrap();
 }
