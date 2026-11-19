@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <title>PS Package Pusher icon (16 px, pixel-aligned)</title>
+  <defs>
+    <clipPath id="panel"><rect width="16" height="16" rx="3"/></clipPath>
+    <clipPath id="sky"><rect width="16" height="10"/></clipPath>
+  </defs>
+  <g clip-path="url(#panel)" shape-rendering="crispEdges">
+    <rect width="16" height="16" fill="#0D0221"/>
+    <circle cx="8" cy="7" r="5.5" fill="#FF6A6A" clip-path="url(#sky)" shape-rendering="auto"/>
+    <rect y="10" width="16" height="6" fill="#1A0638"/>
+    <rect y="10" width="16" height="1" fill="#FF2E97"/>
+    <rect x="0" y="10" width="5" height="2" fill="#00F0FF"/>
+    <polygon points="4,7 8,9 8,14 4,12" fill="#2A0A5E"/>
+    <polygon points="8,9 12,7 12,12 8,14" fill="#4A1597"/>
+    <polygon points="8,5 12,7 8,9 4,7" fill="#7B2FF7"/>
+    <path d="M4,7 8,5 12,7 12,12 8,14 4,12 Z M4,7 8,9 12,7 M8,9 8,14" fill="none" stroke="#00F0FF" stroke-width="1" stroke-linejoin="round" shape-rendering="auto"/>
+    <polygon points="11,10 13,10 13,8 16,11 13,14 13,12 11,12" fill="#00F0FF"/>
+  </g>
+</svg>

@@ -25,3 +25,6 @@ path = "src/bin/mock_rpi.rs"
 lto = true
 codegen-units = 1
 strip = true
+
+[dev-dependencies]
+resvg = "0.50.0"
