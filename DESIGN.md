@@ -809,12 +809,12 @@ Ulazi: kontekstni meni stavke "Deinstaliraj sa konzole…" ili `[⋯]` → "Dein
 | Target | samo `x86_64-pc-windows-msvc`, `+crt-static` | `usize` = 64 bita (Range/Content-Length > 4 GB bez posebnog koda), nema zavisnosti od VC++ runtime-a |
 | Async | **nema** tokio/async; std niti + `std::sync::mpsc` | malo istovremenih operacija; jednostavnije, manji binary |
 | HTTP klijent | `ureq` (blocking), proxy isključen, eksplicitni timeouti | minimalan, bez async runtime-a |
-| HTTP server | `tiny_http` (sync) + vlastita Range logika | mali, zreo; koristi ga i mock. Rizik: kontrola socket timeouta **[PROVJERA]**; rezerva je vlastiti mini server nad `std::net` (samo GET/HEAD) |
-| UI | `eframe`/`egui` (glow renderer, AccessKit uključen), eframe persistence isključen | prozor/stanje se čuvaju u našem `config.json` |
+| HTTP server | vlastiti GET/HEAD server nad `std::net` + Range logika (CP-0, spike S-4) | bez zavisnosti; socket timeouti, tiho odbijanje ne-whitelist IP-a i limit konekcija pod našom kontrolom; isti kod koristi mock |
+| UI | `eframe`/`egui` 0.37 (glow renderer, `default-features = false`, AccessKit uključen; CP-0), eframe persistence isključen | prozor/stanje se čuvaju u našem `config.json` |
 | Dijalozi | `rfd` | native Windows file/folder picker |
 | Slike | `image` sa samo `png` featureom | dekodiranje `icon0.png` |
 | Serijalizacija | `serde`, `serde_json` | config, queue, RPI API |
-| Ikone | `egui-phosphor` | icon font, MIT |
+| Ikone | Phosphor 2.1.2 TTF ugrađen direktno (`assets/fonts/Phosphor.ttf`) + konstante za korištene ikone (CP-0) | `egui-phosphor` 0.14 ne radi sa egui 0.37; bez zavisnosti od forka |
 | Windows API | `windows-sys` (feature-i samo za: `SetThreadExecutionState`, `SystemParametersInfoW`, `GetLocalTime`, `ShellExecuteExW` + `WaitForSingleObject`/`GetExitCodeProcess`) | sprječavanje sleepa, reduce motion, lokalno vrijeme za log, elevirani firewall korak (9.8) |
 | Resursi exe-a | `winresource` (build-dependency) | ikona i VERSIONINFO u `.exe` |
 | Logging | vlastiti modul (bez `log`/`tracing`) | treba nam strukturisan unos za UI + fajl; ~150 linija |
@@ -1043,7 +1043,7 @@ Za `interrupted` stavku sa `task_id`: "Pokušaj ponovo" → `get_task_progress(t
 ### 9.4 HTTP file server
 
 - Bind na **PC LAN IP** (ne `0.0.0.0`), port iz postavki (default 8095). Port zauzet → SRV-01 (prijedlog: sljedeći slobodan port u rasponu +1…+20, korisnik potvrđuje u Postavkama).
-- Prihvata samo zahtjeve sa izvorne IP adrese = `console_ip` (i `127.0.0.1` za self-test/mock). Ostali → zatvaranje konekcije bez odgovora (log DEBUG). Napomena: `tiny_http` 0.12 pri drop-u neodgovorenog `Request`-a automatski šalje 500 i ne daje pristup socketu, pa "bez odgovora" traži vlastiti server; ako ostane `tiny_http`, odgovor je 403 sa praznim tijelom (odluka prototipom 14.3/23).
+- Prihvata samo zahtjeve sa izvorne IP adrese = `console_ip` (i `127.0.0.1` za self-test/mock). Ostali → zatvaranje konekcije bez odgovora (log DEBUG); moguće jer je server vlastiti (CP-0). Preko limita 32 → zahtjev se pročita pa 503 (bez toga klijent dobije reset, nalaz S-4).
 - Rute: `GET|HEAD /pkg/<item_id>/<safe-name>` i `HEAD /healthz` (samo loopback). Sve ostalo → 404 prazno tijelo. Metode osim GET/HEAD → 405.
 - `<safe-name>`: Content ID (ASCII po formatu) + za split `_<n>`, + `.pkg`, filtrirano na `[A-Za-z0-9._-]`; npr. `/pkg/9f2c41d07ab3e5c1/UP0000-CUSA12345_00-0000000000000000_1.pkg`. Bez query stringa. Lokalno ime fajla i putanja se nikad ne pojavljuju u URL-u ni u odgovoru.
 - Lookup je tačno poklapanje `(item_id, safe-name)` u registry mapi → apsolutna putanja; dijelovi URL-a se nikad ne spajaju sa putanjom fajl-sistema (nema path traversala po konstrukciji).
@@ -1288,7 +1288,7 @@ ps-package-pusher/
 20. Preobražaj splash → glavni prozor bez treperenja (transparentnost, DWM zaobljenje, DPI); rezervna varijanta sa drugim viewportom.
 21. Živa promjena Windows teme kroz eframe; tamna naslovna traka.
 22. Da li Windows Firewall prompt dolazi pri bindu na konkretan LAN IP (očekivano da) i za nepotpisan exe.
-23. `tiny_http`: socket timeouti i ponašanje kad konzola nestane usred odgovora (zaglavljene niti vs limit 32); odbijanje ne-whitelist IP-a bez odgovora nije moguće (drop `Request`-a šalje 500, vidi 9.4).
+23. ~~`tiny_http`~~ — riješeno spike-om S-4: vlastiti server (Range > 4 GB, 416, keep-alive, timeouti, limit, tiho odbijanje IP-a potvrđeni na loopbacku).
 24. AccessKit + Narrator: koliko je UI čitljiv.
 25. Veličina release exe-a (cilj < 15 MB sa fontovima).
 

@@ -34,3 +34,9 @@ Datum: 2026-11-19 · Mašina: dev laptop, Windows 11 (build 26300), AMD Radeon i
 3. S-6: putanja do nekoliko legalnih pkg fajlova (idealno i split).
 4. OK za preuzimanje Phosphor TTF fonta (MIT).
 5. OK za push na `pinkyBOZZ/PS-Package-Pusher` (pokreće CI).
+
+## CP-0 odluke vlasnika (2026-11-19)
+
+Prihvaćeno: glow renderer, vlastiti HTTP server (bez `tiny_http`), egui/eframe 0.37 sa direktno ugrađenim Phosphor 2.1.2 TTF (`assets/fonts/`, MIT), logo i ikone iz 0.6. Upisano u DESIGN 7.1, 9.4, 14.3/23.
+
+Otvoreno do zatvaranja CP-0: vizuelna provjera splasha i žive promjene teme (S-1/S-2), firewall test (S-5), stvarni pkg fajlovi (S-6).
