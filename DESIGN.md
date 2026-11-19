@@ -242,7 +242,7 @@ Paleta je struct `Palette` sa svim tokenima; aktivna paleta = `lerp(stara, nova,
 
 ### 2.5 Ikone
 
-- UI ikone: **Phosphor** (MIT) preko crate-a `egui-phosphor` (icon font, regular težina). Nema Sony simbola; za "otkaži" `prohibit`, za "ukloni" `trash`, za "zatvori dijalog" tekstualno dugme "Zatvori".
+- UI ikone: **Phosphor 2.1.2** (MIT), regular TTF ugrađen direktno (`assets/fonts/Phosphor.ttf`, CP-0), u **zasebnoj font familiji** `icons`. Ne smije dijeliti familiju sa Inter-om: Inter ima glifove u istom private-use opsegu (prekrio bi ikone), a Phosphor mapira ASCII slova na ligature (sakrio bi tekst) — nalaz Faze 2. Ikona + tekst se crtaju kao jedan `LayoutJob` sa dva fonta (`fonts::job`). Nema Sony simbola; za "otkaži" `prohibit`, za "ukloni" `trash`, za "zatvori dijalog" tekstualno dugme "Zatvori".
 - Ikona aplikacije: `assets/icon/app.ico` sa 16, 24, 32, 48, 64, 128, 256 px.
   - 256/128/64/48: pun logo (sunce, mreža, kutija, strelica) na `#0D0221` kvadratu sa radijusom 18 %.
   - 32/24: bez mreže; polukrug sunca (2 pruge), kutija, strelica debljine ≥ 3 px.
