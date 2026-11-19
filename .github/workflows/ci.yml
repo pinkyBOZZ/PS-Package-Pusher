@@ -12,16 +12,22 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Toolchain (from rust-toolchain.toml)
         run: rustup show active-toolchain
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Privacy check (no real user profile paths in tracked files)
+        shell: bash
+        run: |
+          if git grep -n -I -E '[A-Za-z]:[\/]+Users[\/]+[A-Za-z0-9._~-]+' -- . | grep -v -E 'KORISN~1|Users\Someone'; then
+            echo "::error::a real user profile path is committed"; exit 1
+          fi
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
