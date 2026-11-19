@@ -29,6 +29,11 @@ pub enum Command {
     ApplySettings(Box<Config>),
     ClearFinished,
     Shutdown,
+    /// Internal: result of the check right after adding.
+    Precheck {
+        id: String,
+        exists: bool,
+    },
     /// Internal: result from the parse pool.
     Parsed {
         id: String,

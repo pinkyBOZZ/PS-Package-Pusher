@@ -1,6 +1,6 @@
 # Faza 1 — izvještaj (jezgro bez UI-ja)
 
-Datum: 2026-11-19 · Grana: `main` · Testovi: **51 prolaze** (32 unit + 19 integracionih), 3 uzastopna puna prolaza bez slučajnih padova · clippy `-D warnings` i rustfmt čisti.
+Datum: 2026-11-19 · Grana: `main` · Testovi: **47 prolazi** (32 unit + 15 integracionih), 3 uzastopna puna prolaza bez slučajnih padova · clippy `-D warnings` i rustfmt čisti.
 
 ## Urađeno po PLAN zadacima
 

@@ -496,6 +496,7 @@ impl Engine {
         match cmd {
             Command::AddPaths(paths) => self.add_paths(paths),
             Command::Parsed { id, result } => self.parsed(id, *result),
+            Command::Precheck { id, exists } => self.precheck_result(&id, exists),
             Command::Remove(id) => {
                 if let Some(i) = self.idx(&id) {
                     if self.items[i].state.is_active() {
@@ -637,6 +638,7 @@ impl Engine {
                 icon: None,
                 live: queue::Live::default(),
                 note: None,
+                pre: None,
             };
             self.items.push(it);
             self.upsert(self.items.len() - 1);
@@ -788,10 +790,73 @@ impl Engine {
                 })
                 .then_with(|| a.title.cmp(&b.title))
         });
+        let new_ids: Vec<String> = batch
+            .iter()
+            .filter(|i| matches!(i.state, State::Ready | State::Queued))
+            .map(|i| i.id.clone())
+            .collect();
         self.items.extend(batch);
         self.emit(Event::Order(
             self.items.iter().map(|i| i.id.clone()).collect(),
         ));
+        self.precheck(new_ids);
+    }
+
+    /// Background `is_exists` for newly added items (DESIGN 6.1/6); results come back as `Precheck`.
+    fn precheck(&self, ids: Vec<String>) {
+        let Some(ip) = self.console() else { return };
+        let jobs: Vec<(String, String)> = ids
+            .iter()
+            .filter_map(|id| {
+                self.idx(id)
+                    .map(|i| (id.clone(), self.items[i].title_id.clone()))
+            })
+            .collect();
+        if jobs.is_empty() {
+            return;
+        }
+        let (port, dialect, tx) = (
+            self.o.config.console_port,
+            self.o.dialect.clone(),
+            self.self_tx.clone(),
+        );
+        thread::spawn(move || {
+            let c = Client::new(ip, port, dialect);
+            for (id, title) in jobs {
+                match c.is_exists(&title).0 {
+                    Ok(e) => {
+                        let _ = tx.send(Command::Precheck {
+                            id,
+                            exists: e.exists,
+                        });
+                    }
+                    Err(_) => break, // console not reachable now: no info, the real check runs before install
+                }
+            }
+        });
+    }
+
+    fn precheck_result(&mut self, id: &str, exists: bool) {
+        let Some(i) = self.idx(id) else { return };
+        let it = &self.items[i];
+        let pre = match it.kind() {
+            Kind::Update | Kind::Dlc if !exists => {
+                let base = self.items[..i].iter().find(|o| {
+                    o.kind() == Kind::Game
+                        && o.title_id == it.title_id
+                        && !matches!(o.state, State::Failed | State::Cancelled | State::Invalid)
+                });
+                match base {
+                    Some(b) => queue::Pre::WaitsFor(b.id.clone()),
+                    None => queue::Pre::BaseMissing,
+                }
+            }
+            Kind::Update | Kind::Dlc => queue::Pre::NotInstalled,
+            _ if exists => queue::Pre::Installed,
+            _ => queue::Pre::NotInstalled,
+        };
+        self.items[i].pre = Some(pre);
+        self.upsert(i);
     }
 
     // ---------- user decisions / task ops ----------

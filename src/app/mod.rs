@@ -69,6 +69,10 @@ pub struct App {
     reach: Option<Reach>,
     logo: Option<egui::TextureHandle>,
     frames: u64,
+    queue: queue_view::QueueView,
+    running: bool,
+    allow_close: bool,
+    close_dialog: bool,
     /// Debug-only override for screenshots (`--theme light|dark`); the app follows Windows otherwise.
     force_theme: Option<bool>,
 }
@@ -76,7 +80,9 @@ pub struct App {
 use log_view::LogView;
 
 impl App {
-    /// `start_tab` is a debug aid for screenshots (`--tab settings|log|gallery`).
+    /// `start_tab`, `theme`, `add`, `start` are debug aids for screenshots and demos
+    /// (`--tab`, `--theme`, `--add <path>`, `--start`; only with `--debug`).
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         cc: &eframe::CreationContext<'_>,
         cfg: Config,
@@ -85,6 +91,8 @@ impl App {
         debug: bool,
         start_tab: Option<&str>,
         theme: Option<&str>,
+        add: Vec<PathBuf>,
+        start: bool,
     ) -> Self {
         fonts::install(&cc.egui_ctx);
         anim::set_reduced(!crate::winapi::animations_enabled());
@@ -118,6 +126,12 @@ impl App {
             "app",
             format!("PS Package Pusher {} started", env!("CARGO_PKG_VERSION")),
         );
+        if debug && !add.is_empty() {
+            let _ = h.tx.send(Command::AddPaths(add));
+            if start {
+                let _ = h.tx.send(Command::StartQueue);
+            }
+        }
         Self {
             theme: theme::ThemeState::default(),
             t: I18n::new(Lang::from_code(&cfg.language)),
@@ -145,6 +159,10 @@ impl App {
             reach: None,
             logo,
             frames: 0,
+            queue: queue_view::QueueView::default(),
+            running: false,
+            allow_close: false,
+            close_dialog: false,
             force_theme: if debug {
                 theme.map(|t| t == "dark")
             } else {
@@ -153,7 +171,7 @@ impl App {
         }
     }
 
-    fn drain_events(&mut self) {
+    fn drain_events(&mut self, now: f64) {
         while let Ok(e) = self.events.try_recv() {
             match e {
                 Event::ItemUpsert(i) => {
@@ -163,7 +181,12 @@ impl App {
                     self.items.insert(i.id.clone(), *i);
                 }
                 Event::ItemRemoved(id) => {
-                    self.items.remove(&id);
+                    if let (Some(ix), Some(item)) = (
+                        self.order.iter().position(|x| *x == id),
+                        self.items.remove(&id),
+                    ) {
+                        self.queue.removed(ix, item, now);
+                    }
                     self.order.retain(|x| *x != id);
                 }
                 Event::Order(o) => self.order = o,
@@ -175,8 +198,178 @@ impl App {
                     self.banner = b;
                 }
                 Event::ServerStatus(s) => self.server = s,
-                Event::AskDecision(_) | Event::QueueRunning(_) | Event::Info(_) => {}
+                Event::QueueRunning(r) => self.running = r,
+                Event::Info(msg) => self.queue.info(msg, now),
+                Event::AskDecision(_) => {}
             }
+        }
+    }
+
+    /// "Transfer in progress" confirmation on window close (DESIGN 4.10).
+    fn close_guard(&mut self, ctx: &egui::Context) {
+        if ctx.input(|i| i.viewport().close_requested()) && self.busy() && !self.allow_close {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            self.close_dialog = true;
+        }
+    }
+
+    fn modal(ctx: &egui::Context, p: &Palette, id: &str, width: f32, add: impl FnOnce(&mut Ui)) {
+        egui::Modal::new(egui::Id::unique(id))
+            .frame(
+                egui::Frame::new()
+                    .fill(p.bg_surface)
+                    .corner_radius(12)
+                    .inner_margin(24),
+            )
+            .backdrop_color(p.overlay)
+            .show(ctx, |ui| {
+                ui.set_width(width);
+                add(ui);
+            });
+    }
+
+    fn dialogs(&mut self, ctx: &egui::Context, p: &Palette) {
+        let esc = ctx.input(|i| i.key_pressed(egui::Key::Escape));
+        if self.close_dialog {
+            let mut answer = None;
+            Self::modal(ctx, p, "close", 440.0, |ui| {
+                ui.label(fonts::job(
+                    icon::WARNING,
+                    &self.t.t("dialog.close.title"),
+                    fonts::semibold(size::TITLE),
+                    p.warning,
+                ));
+                widgets::space(ui, 2);
+                ui.label(RichText::new(self.t.t("dialog.close.text")).color(p.text_primary));
+                widgets::space(ui, 4);
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if widgets::button(ui, p, Kind::Danger, None, &self.t.t("dialog.close.close"))
+                        .clicked()
+                    {
+                        answer = Some(true);
+                    }
+                    let stay = widgets::button(
+                        ui,
+                        p,
+                        Kind::Secondary,
+                        None,
+                        &self.t.t("dialog.close.stay"),
+                    );
+                    stay.request_focus();
+                    if stay.clicked() || esc {
+                        answer = Some(false);
+                    }
+                });
+            });
+            if let Some(close) = answer {
+                self.close_dialog = false;
+                if close {
+                    self.allow_close = true;
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+            }
+        }
+        if let Some(id) = self.queue.confirm_remove.clone() {
+            let mut answer = None;
+            Self::modal(ctx, p, "remove", 440.0, |ui| {
+                ui.label(fonts::job(
+                    icon::WARNING,
+                    &self.t.t("dialog.remove.title"),
+                    fonts::semibold(size::HEADING),
+                    p.warning,
+                ));
+                widgets::space(ui, 4);
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if widgets::button(
+                        ui,
+                        p,
+                        Kind::Danger,
+                        Some(icon::TRASH),
+                        &self.t.t("dialog.remove.yes"),
+                    )
+                    .clicked()
+                    {
+                        answer = Some(true);
+                    }
+                    let no = widgets::button(
+                        ui,
+                        p,
+                        Kind::Secondary,
+                        None,
+                        &self.t.t("dialog.remove.no"),
+                    );
+                    no.request_focus();
+                    if no.clicked() || esc {
+                        answer = Some(false);
+                    }
+                });
+            });
+            if let Some(yes) = answer {
+                if yes {
+                    let _ = self.engine_tx.send(Command::Remove(id));
+                }
+                self.queue.confirm_remove = None;
+            }
+        }
+        // shortcut: simple error details; Faza 4 brings the full dialog 4.8 with the console log
+        if let Some(e) = self
+            .queue
+            .details
+            .as_ref()
+            .and_then(|id| self.items.get(id))
+            .and_then(|i| i.error.clone())
+        {
+            let mut done = esc;
+            Self::modal(ctx, p, "details", 600.0, |ui| {
+                ui.label(fonts::job(
+                    icon::WARNING_OCTAGON,
+                    &format!(
+                        "{} · {}",
+                        e.code,
+                        crate::errors::describe(&self.t, &e, "what")
+                    ),
+                    fonts::semibold(size::HEADING),
+                    p.danger,
+                ));
+                widgets::space(ui, 2);
+                ui.label(
+                    RichText::new(format!(
+                        "{}: {}",
+                        self.t.t("log.action"),
+                        crate::errors::describe(&self.t, &e, "action")
+                    ))
+                    .color(p.text_primary),
+                );
+                for line in [&e.detail, &e.technical]
+                    .into_iter()
+                    .filter(|s| !s.is_empty())
+                {
+                    ui.label(
+                        RichText::new(line)
+                            .font(fonts::mono(size::CAPTION))
+                            .color(p.text_secondary),
+                    );
+                }
+                widgets::space(ui, 4);
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if widgets::button(
+                        ui,
+                        p,
+                        Kind::Secondary,
+                        None,
+                        &self.t.t("dialog.close.close"),
+                    )
+                    .clicked()
+                    {
+                        done = true;
+                    }
+                });
+            });
+            if done {
+                self.queue.details = None;
+            }
+        } else {
+            self.queue.details = None;
         }
     }
 
@@ -343,7 +536,7 @@ impl App {
                 format!(
                     "{}: {}",
                     r.code,
-                    self.t.t(&format!("error.{}.what", r.code))
+                    crate::errors::describe(&self.t, r, "what")
                 ),
                 format!(
                     "{} {}",
@@ -474,7 +667,16 @@ impl eframe::App for App {
         let ctx = ui.ctx().clone();
         self.frames += 1;
         let now = ctx.input(|i| i.time);
-        self.drain_events();
+        self.drain_events(now);
+        // drag & drop works on any tab and switches to the queue (DESIGN 4.4)
+        let (dropped, hovering) = queue_view::dropped(&ctx);
+        if hovering > 0 || !dropped.is_empty() {
+            self.switch(Tab::Queue, now);
+        }
+        if !dropped.is_empty() {
+            let _ = self.engine_tx.send(Command::AddPaths(dropped));
+        }
+        self.close_guard(&ctx);
         if let Some(r) = self.settings.poll() {
             self.reach = Some(r);
         }
@@ -569,7 +771,19 @@ impl eframe::App for App {
                                 .iter()
                                 .filter_map(|id| self.items.get(id))
                                 .collect();
-                            queue_view::ui(&mut child, &p, &self.t, &items);
+                            match self.queue.ui(
+                                &mut child,
+                                &p,
+                                &self.t,
+                                &items,
+                                &self.engine_tx,
+                                self.running,
+                                hovering,
+                            ) {
+                                queue_view::Action::AddFiles => pick(&self.engine_tx, false),
+                                queue_view::Action::AddFolder => pick(&self.engine_tx, true),
+                                queue_view::Action::None => {}
+                            }
                         }
                         Tab::Settings => {
                             let busy = self.busy();
@@ -609,6 +823,7 @@ impl eframe::App for App {
                     }
                 });
         });
+        self.dialogs(&ctx, &p);
         if self.debug {
             egui::Area::new(egui::Id::unique("dbg"))
                 .anchor(egui::Align2::RIGHT_BOTTOM, vec2(-8.0, -8.0))
@@ -641,4 +856,22 @@ impl eframe::App for App {
         }
         self.log.info("app", "exit");
     }
+}
+
+/// Native file/folder picker on its own thread so the UI never blocks (DESIGN 6.1, 7.3).
+fn pick(tx: &mpsc::Sender<Command>, folder: bool) {
+    let tx = tx.clone();
+    std::thread::spawn(move || {
+        let picked: Vec<PathBuf> = if folder {
+            rfd::FileDialog::new().pick_folders().unwrap_or_default()
+        } else {
+            rfd::FileDialog::new()
+                .add_filter("PS4 PKG", &["pkg", "PKG"])
+                .pick_files()
+                .unwrap_or_default()
+        };
+        if !picked.is_empty() {
+            let _ = tx.send(Command::AddPaths(picked));
+        }
+    });
 }

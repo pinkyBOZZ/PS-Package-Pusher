@@ -206,6 +206,19 @@ pub struct Item {
     pub live: Live,
     /// Short context line (e.g. "split: 3 parts", missing parts).
     pub note: Option<String>,
+    /// Info from the check right after adding (DESIGN 6.1/6); never replaces the check before install.
+    pub pre: Option<Pre>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Pre {
+    NotInstalled,
+    /// Game already on the console (Faza 4 asks Skip/Reinstall).
+    Installed,
+    /// Update/DLC whose base game is earlier in the queue.
+    WaitsFor(String),
+    /// Update/DLC whose base game is neither installed nor queued.
+    BaseMissing,
 }
 
 impl Item {
@@ -234,6 +247,7 @@ impl Item {
             icon: info.icon.clone().map(Arc::new),
             live: Live::default(),
             note: None,
+            pre: None,
         }
     }
 }
@@ -314,6 +328,7 @@ impl From<Saved> for Item {
             icon: None,
             live: Live::default(),
             note: None,
+            pre: None,
         }
     }
 }

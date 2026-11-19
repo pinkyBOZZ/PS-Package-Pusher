@@ -140,6 +140,18 @@ pub fn find_console_codes(text: &str) -> Vec<String> {
     out
 }
 
+/// Localised `what`/`action` text with every `{placeholder}` filled by the report's detail.
+pub fn describe(t: &crate::i18n::I18n, e: &ErrorReport, part: &str) -> String {
+    let mut s = t.t(&format!("error.{}.{part}", e.code));
+    while let (Some(a), Some(b)) = (s.find('{'), s.find('}')) {
+        if b < a {
+            break;
+        }
+        s.replace_range(a..=b, e.detail.trim());
+    }
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

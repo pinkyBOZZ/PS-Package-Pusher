@@ -12,6 +12,12 @@ fn main() -> eframe::Result {
             .cloned()
     };
     let (start_tab, theme) = (arg("--tab"), arg("--theme"));
+    let add: Vec<std::path::PathBuf> = args
+        .windows(2)
+        .filter(|w| w[0] == "--add")
+        .map(|w| w[1].clone().into())
+        .collect();
+    let start = args.iter().any(|a| a == "--start");
     let data_dir = storage::data_dir();
     let log = Logger::new(&data_dir.join("logs"), debug);
     let (cfg, issues) = config::load(&data_dir);
@@ -60,6 +66,8 @@ fn main() -> eframe::Result {
                 debug,
                 start_tab.as_deref(),
                 theme.as_deref(),
+                add,
+                start,
             )))
         }),
     )
