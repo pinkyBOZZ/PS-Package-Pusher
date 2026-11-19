@@ -1,0 +1,1 @@
+//! UI: log_view.
