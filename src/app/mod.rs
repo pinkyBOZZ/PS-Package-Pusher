@@ -76,6 +76,8 @@ pub struct App {
     dialogs: dialogs::Dialogs,
     fw: dialogs::Firewall,
     pending_tab: Option<Tab>,
+    splash: Option<splash::Splash>,
+    queue_loaded: Option<mpsc::Sender<()>>,
     /// Debug-only override for screenshots (`--theme light|dark`); the app follows Windows otherwise.
     force_theme: Option<bool>,
 }
@@ -99,6 +101,14 @@ impl App {
     ) -> Self {
         fonts::install(&cc.egui_ctx);
         anim::set_reduced(!crate::winapi::animations_enabled());
+        // debug aid for the UI matrix (PLAN 6.4): PSPP_ZOOM=1.5 simulates 150 % scaling
+        if debug
+            && let Some(z) = std::env::var("PSPP_ZOOM")
+                .ok()
+                .and_then(|z| z.parse::<f32>().ok())
+        {
+            cc.egui_ctx.set_zoom_factor(z);
+        }
         cc.egui_ctx
             .options_mut(|o| o.theme_preference = egui::ThemePreference::System);
         let (etx, erx) = mpsc::channel();
@@ -136,6 +146,10 @@ impl App {
             }
         }
         let cfg_firewall_shown = cfg.firewall_notice_shown;
+        let (loaded_tx, loaded_rx) = mpsc::channel();
+        let splash_state = cfg
+            .splash_enabled
+            .then(|| splash::Splash::new(cc.egui_ctx.input(|i| i.time), &cfg, loaded_rx));
         Self {
             theme: theme::ThemeState::default(),
             t: I18n::new(Lang::from_code(&cfg.language)),
@@ -170,6 +184,8 @@ impl App {
             dialogs: dialogs::Dialogs::with_firewall_notice(!cfg_firewall_shown),
             fw: dialogs::Firewall::default(),
             pending_tab: None,
+            splash: splash_state,
+            queue_loaded: Some(loaded_tx),
             force_theme: if debug {
                 theme.map(|t| t == "dark")
             } else {
@@ -196,7 +212,12 @@ impl App {
                     }
                     self.order.retain(|x| *x != id);
                 }
-                Event::Order(o) => self.order = o,
+                Event::Order(o) => {
+                    self.order = o;
+                    if let Some(tx) = self.queue_loaded.take() {
+                        let _ = tx.send(()); // splash step "Loading the queue…" done
+                    }
+                }
                 Event::Banner(b) => {
                     if matches!(b, Some(Banner::Global(ref r)) if r.code.as_str().starts_with("NET"))
                     {
@@ -238,18 +259,7 @@ impl App {
     }
 
     fn modal(ctx: &egui::Context, p: &Palette, id: &str, width: f32, add: impl FnOnce(&mut Ui)) {
-        egui::Modal::new(egui::Id::unique(id))
-            .frame(
-                egui::Frame::new()
-                    .fill(p.bg_surface)
-                    .corner_radius(12)
-                    .inner_margin(24),
-            )
-            .backdrop_color(p.overlay)
-            .show(ctx, |ui| {
-                ui.set_width(width);
-                add(ui);
-            });
+        dialogs::modal(ctx, p, id, width, add);
     }
 
     fn dialogs(&mut self, ctx: &egui::Context, p: &Palette) {
@@ -485,15 +495,15 @@ impl App {
                 };
                 let ip = self.cfg.console_ip.clone().unwrap_or_default();
                 let color = settings_view::reach_color(p, self.reach, configured);
+                // narrow window / zoomed UI: icon + IP only, full state in the tooltip
+                let full = format!("{ip}  {txt}");
+                let compact = ui.available_width() < 300.0;
+                let label = if compact { ip.clone() } else { full.clone() };
                 let r = ui.add(
-                    egui::Button::new(fonts::job(
-                        ic,
-                        &format!("{ip}  {txt}"),
-                        fonts::regular(size::CAPTION),
-                        color,
-                    ))
-                    .frame(false),
+                    egui::Button::new(fonts::job(ic, &label, fonts::regular(size::CAPTION), color))
+                        .frame(false),
                 );
+                let r = if compact { r.on_hover_text(full) } else { r };
                 if r.clicked() {
                     self.switch(Tab::Settings, now);
                 }
@@ -686,6 +696,18 @@ impl eframe::App for App {
         self.frames += 1;
         let now = ctx.input(|i| i.time);
         self.drain_events(now);
+        if let Some(s) = self.splash.as_mut() {
+            if s.ui(ui, &self.t) {
+                if let Some(w) = s.warning.take() {
+                    self.log.warn("app", w).code(crate::errors::Code::Srv01);
+                }
+                self.splash = None;
+                splash::morph(&ctx, &self.cfg);
+                self.tab_since = now; // main window content fades in (motion.tab)
+                ctx.request_repaint();
+            }
+            return;
+        }
         // drag & drop works on any tab and switches to the queue (DESIGN 4.4)
         let (dropped, hovering) = queue_view::dropped(&ctx);
         if hovering > 0 || !dropped.is_empty() {
@@ -870,6 +892,9 @@ impl eframe::App for App {
     }
 
     fn clear_color(&self, _: &egui::Visuals) -> [f32; 4] {
+        if self.splash.is_some() {
+            return [0.0; 4]; // transparent corners around the rounded splash
+        }
         self.theme.current.bg_base.to_normalized_gamma_f32()
     }
 

@@ -160,8 +160,8 @@ impl QueueView {
             let _ = tx.send(Command::StartQueue);
         }
 
-        // toolbar + footer (DESIGN 4.3)
-        ui.horizontal(|ui| {
+        // toolbar + footer (DESIGN 4.3); wraps when the window is narrow or zoomed
+        ui.horizontal_wrapped(|ui| {
             if widgets::button(
                 ui,
                 p,
@@ -342,6 +342,17 @@ impl QueueView {
                     );
                     if h < 2.0 {
                         continue;
+                    }
+                    if !is_ghost {
+                        // screen readers: "title, status" (DESIGN 12)
+                        let label = format!(
+                            "{}, {}",
+                            it.title.clone().unwrap_or_else(|| it.title_id.clone()),
+                            t.t(&format!("state.{:?}", it.state))
+                        );
+                        resp.widget_info(|| {
+                            egui::WidgetInfo::labeled(egui::Role::ListItem, true, label.clone())
+                        });
                     }
                     let row = Rect::from_min_size(rect.min, vec2(width, ROW_H));
                     let dy = if is_ghost {

@@ -19,7 +19,23 @@ use crate::{
 use eframe::egui::{self, Align, Layout, RichText, Ui};
 use std::sync::mpsc::{self, Receiver, Sender};
 
+/// Modal with `motion.dialog.in`: content and backdrop fade in over 180 ms (DESIGN 2.6).
+/// A dialog counts as newly opened when it was not shown in the previous frame.
 pub fn modal(ctx: &egui::Context, p: &Palette, id: &str, width: f32, add: impl FnOnce(&mut Ui)) {
+    let key = egui::Id::unique(("modal-open", id));
+    let (now, frame) = (ctx.input(|i| i.time), ctx.cumulative_pass_nr());
+    let start = ctx
+        .data(|d| d.get_temp::<(f64, u64)>(key))
+        .filter(|(_, last)| last + 1 >= frame)
+        .map_or(now, |(s, _)| s);
+    ctx.data_mut(|d| d.insert_temp(key, (start, frame)));
+    let k = super::anim::progress(
+        ctx,
+        start,
+        super::anim::DIALOG_IN,
+        egui::emath::easing::cubic_out,
+    )
+    .unwrap_or(1.0);
     egui::Modal::new(egui::Id::unique(id))
         .frame(
             egui::Frame::new()
@@ -27,8 +43,9 @@ pub fn modal(ctx: &egui::Context, p: &Palette, id: &str, width: f32, add: impl F
                 .corner_radius(12)
                 .inner_margin(24),
         )
-        .backdrop_color(p.overlay)
+        .backdrop_color(p.overlay.gamma_multiply(k))
         .show(ctx, |ui| {
+            ui.multiply_opacity(k);
             ui.set_width(width);
             add(ui);
         });

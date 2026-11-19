@@ -40,7 +40,8 @@ fn main() -> eframe::Result {
         .with_title("PS Package Pusher")
         .with_min_inner_size([880.0, 560.0])
         .with_inner_size([1100.0, 720.0]);
-    if let Some(w) = cfg.window {
+    // with the splash, the saved geometry is applied by the morph instead
+    if let Some(w) = cfg.window.filter(|_| !cfg.splash_enabled) {
         viewport = viewport
             .with_inner_size([w.w.max(880.0), w.h.max(560.0)])
             .with_position([w.x, w.y])
@@ -51,11 +52,21 @@ fn main() -> eframe::Result {
     {
         viewport = viewport.with_icon(icon);
     }
+    // splash: the root viewport starts small, borderless and transparent, then morphs (DESIGN 4.1)
+    if cfg.splash_enabled {
+        viewport = viewport
+            .with_inner_size(pspp::app::splash::SIZE)
+            .with_min_inner_size([100.0, 100.0])
+            .with_decorations(false)
+            .with_transparent(true)
+            .with_resizable(false)
+            .with_maximized(false);
+    }
     let options = eframe::NativeOptions {
         viewport,
         renderer: eframe::Renderer::Glow,
         persist_window: false,
-        centered: cfg.window.is_none(),
+        centered: cfg.window.is_none() || cfg.splash_enabled,
         ..Default::default()
     };
     eframe::run_native(

@@ -114,6 +114,13 @@ pub fn button_enabled(
     if resp.has_focus() {
         focus_ring(ui, rect, p, 8.0);
     }
+    // custom-painted: tell AccessKit / Narrator what this is (DESIGN 12)
+    let name = if label.is_empty() {
+        icon_s.unwrap_or_default().to_string()
+    } else {
+        label.to_string()
+    };
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, name.clone()));
     resp.on_hover_cursor(if enabled {
         egui::CursorIcon::PointingHand
     } else {
