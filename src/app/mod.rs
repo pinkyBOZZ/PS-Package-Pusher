@@ -73,6 +73,9 @@ pub struct App {
     running: bool,
     allow_close: bool,
     close_dialog: bool,
+    dialogs: dialogs::Dialogs,
+    fw: dialogs::Firewall,
+    pending_tab: Option<Tab>,
     /// Debug-only override for screenshots (`--theme light|dark`); the app follows Windows otherwise.
     force_theme: Option<bool>,
 }
@@ -132,6 +135,7 @@ impl App {
                 let _ = h.tx.send(Command::StartQueue);
             }
         }
+        let cfg_firewall_shown = cfg.firewall_notice_shown;
         Self {
             theme: theme::ThemeState::default(),
             t: I18n::new(Lang::from_code(&cfg.language)),
@@ -163,6 +167,9 @@ impl App {
             running: false,
             allow_close: false,
             close_dialog: false,
+            dialogs: dialogs::Dialogs::with_firewall_notice(!cfg_firewall_shown),
+            fw: dialogs::Firewall::default(),
+            pending_tab: None,
             force_theme: if debug {
                 theme.map(|t| t == "dark")
             } else {
@@ -200,7 +207,24 @@ impl App {
                 Event::ServerStatus(s) => self.server = s,
                 Event::QueueRunning(r) => self.running = r,
                 Event::Info(msg) => self.queue.info(msg, now),
-                Event::AskDecision(_) => {}
+                Event::AskDecision(id) => self.dialogs.decision = Some(id),
+                Event::InstalledResult { target, result } => {
+                    if let Some(msg) = self.dialogs.installed_result(&self.t, target, result) {
+                        self.queue.info(msg, now);
+                    }
+                }
+                Event::UninstallResult { target, result } => {
+                    let msg = match result {
+                        Ok(true) => self.t.t_args("uninstall.done", &[("id", &target.id)]),
+                        Ok(false) => self.t.t_args("uninstall.was_not", &[("id", &target.id)]),
+                        Err(e) => format!(
+                            "{}: {}",
+                            e.code,
+                            crate::errors::describe(&self.t, &e, "what")
+                        ),
+                    };
+                    self.queue.info(msg, now);
+                }
             }
         }
     }
@@ -311,65 +335,40 @@ impl App {
                 self.queue.confirm_remove = None;
             }
         }
-        // shortcut: simple error details; Faza 4 brings the full dialog 4.8 with the console log
-        if let Some(e) = self
-            .queue
-            .details
-            .as_ref()
-            .and_then(|id| self.items.get(id))
-            .and_then(|i| i.error.clone())
-        {
-            let mut done = esc;
-            Self::modal(ctx, p, "details", 600.0, |ui| {
-                ui.label(fonts::job(
-                    icon::WARNING_OCTAGON,
-                    &format!(
-                        "{} · {}",
-                        e.code,
-                        crate::errors::describe(&self.t, &e, "what")
-                    ),
-                    fonts::semibold(size::HEADING),
-                    p.danger,
-                ));
-                widgets::space(ui, 2);
-                ui.label(
-                    RichText::new(format!(
-                        "{}: {}",
-                        self.t.t("log.action"),
-                        crate::errors::describe(&self.t, &e, "action")
-                    ))
-                    .color(p.text_primary),
-                );
-                for line in [&e.detail, &e.technical]
-                    .into_iter()
-                    .filter(|s| !s.is_empty())
-                {
-                    ui.label(
-                        RichText::new(line)
-                            .font(fonts::mono(size::CAPTION))
-                            .color(p.text_secondary),
-                    );
-                }
-                widgets::space(ui, 4);
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if widgets::button(
-                        ui,
-                        p,
-                        Kind::Secondary,
-                        None,
-                        &self.t.t("dialog.close.close"),
-                    )
-                    .clicked()
-                    {
-                        done = true;
-                    }
-                });
+        // Faza 4 dialogs (4.7, 4.8, 4.9, 4.11, 4.12)
+        if let Some(id) = self.queue.details.take() {
+            self.dialogs.error = Some(id);
+        }
+        if let Some(id) = self.queue.decide.take() {
+            self.dialogs.decision = Some(id);
+        }
+        if std::mem::take(&mut self.queue.by_id_request) {
+            self.dialogs.by_id = Some(dialogs::ById {
+                kind: crate::rpi::UninstallKind::Game,
+                text: String::new(),
+                result: None,
+                checking: false,
             });
-            if done {
-                self.queue.details = None;
+        }
+        let textures = |id: &str| self.queue.texture_of(id);
+        match self.dialogs.ui(
+            ctx,
+            p,
+            &self.t,
+            &self.items,
+            &textures,
+            &self.engine_tx,
+            &mut self.fw,
+            self.cfg.server_port,
+        ) {
+            dialogs::Outcome::FirewallClosed(dont_show) => {
+                if dont_show {
+                    self.cfg.firewall_notice_shown = true;
+                    let _ = config::save(&self.data_dir, &self.cfg);
+                }
             }
-        } else {
-            self.queue.details = None;
+            dialogs::Outcome::OpenLog => self.pending_tab = Some(Tab::Log),
+            dialogs::Outcome::None => {}
         }
     }
 
@@ -545,15 +544,34 @@ impl App {
                 ),
             ),
         };
-        if widgets::banner(
-            ui,
-            p,
-            kind,
-            &title,
-            &text,
-            Some(&self.t.t("banner.open_settings")),
-        ) {
-            self.switch(Tab::Settings, now);
+        // SRV-01 carries "(free: N)": offer that port directly (DESIGN 9.4)
+        let free_port = match &b {
+            Banner::Global(r) if r.code == crate::errors::Code::Srv01 => r
+                .detail
+                .split("free: ")
+                .nth(1)
+                .and_then(|x| x.trim_end_matches(')').parse::<u16>().ok()),
+            _ => None,
+        };
+        let action = match free_port {
+            Some(port) => self
+                .t
+                .t_args("banner.server_port.action", &[("port", &port.to_string())]),
+            None => self.t.t("banner.open_settings"),
+        };
+        if widgets::banner(ui, p, kind, &title, &text, Some(&action)) {
+            match free_port {
+                Some(port) => {
+                    self.cfg.server_port = port;
+                    let _ = config::save(&self.data_dir, &self.cfg);
+                    self.settings.draft.server_port = port.to_string();
+                    let _ = self
+                        .engine_tx
+                        .send(Command::ApplySettings(Box::new(self.cfg.clone())));
+                    self.banner = None;
+                }
+                None => self.switch(Tab::Settings, now),
+            }
         }
         widgets::space(ui, 2);
     }
@@ -677,6 +695,15 @@ impl eframe::App for App {
             let _ = self.engine_tx.send(Command::AddPaths(dropped));
         }
         self.close_guard(&ctx);
+        if let Some(t) = self.pending_tab.take() {
+            self.switch(t, now);
+        }
+        if (self.dialogs.firewall || self.tab == Tab::Settings)
+            && self.fw.status.is_none()
+            && !self.fw.busy
+        {
+            self.fw.refresh(&ctx);
+        }
         if let Some(r) = self.settings.poll() {
             self.reach = Some(r);
         }
@@ -795,6 +822,8 @@ impl eframe::App for App {
                                 self.server,
                                 busy,
                                 &self.data_dir,
+                                &mut self.fw,
+                                &mut self.dialogs.firewall,
                             ) {
                                 let lang_changed = new.language != self.cfg.language;
                                 let mut new = new;

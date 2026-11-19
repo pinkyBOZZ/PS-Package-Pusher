@@ -1,7 +1,17 @@
 //! Command (UI → engine) and Event (engine → UI), DESIGN 7.3.
 
 use super::queue::{Decision, Item, PartRef};
-use crate::{config::Config, errors::ErrorReport, pkg::PkgInfo};
+use crate::{config::Config, errors::ErrorReport, pkg::PkgInfo, rpi::UninstallKind};
+
+/// What to uninstall (DESIGN 6.7): a queue item or a typed ID (dialog 4.12).
+#[derive(Debug, Clone, PartialEq)]
+pub struct UninstallTarget {
+    pub kind: UninstallKind,
+    /// Title ID for games/updates, Content ID for DLC.
+    pub id: String,
+    /// Queue item this came from, if any.
+    pub item: Option<String>,
+}
 use std::{net::SocketAddrV4, path::PathBuf};
 
 /// Parsed package data, its parts and an optional note (`split: n`, internal `reload`).
@@ -29,6 +39,15 @@ pub enum Command {
     ApplySettings(Box<Config>),
     ClearFinished,
     Shutdown,
+    /// Is the target installed? Answer: `Event::InstalledResult` (no state change).
+    CheckInstalled(UninstallTarget),
+    /// Uninstall after the user confirmed dialog 4.11.
+    Uninstall(UninstallTarget),
+    /// Internal: background uninstall finished. Ok(true) = removed, Ok(false) = was not installed.
+    UninstallDone {
+        target: UninstallTarget,
+        result: Result<bool, ErrorReport>,
+    },
     /// Internal: result of the check right after adding.
     Precheck {
         id: String,
@@ -59,4 +78,13 @@ pub enum Event {
     QueueRunning(bool),
     /// One-off info line (duplicates, skipped non-pkg files), already in the log too.
     Info(String),
+    /// Ok(installed) or the error text (RPI-02).
+    InstalledResult {
+        target: UninstallTarget,
+        result: Result<bool, String>,
+    },
+    UninstallResult {
+        target: UninstallTarget,
+        result: Result<bool, ErrorReport>,
+    },
 }

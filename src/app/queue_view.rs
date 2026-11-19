@@ -9,7 +9,7 @@ use super::{
 use crate::{
     engine::{
         commands::Command,
-        queue::{Decision, Item, Pre, State},
+        queue::{Item, Pre, State},
     },
     i18n::I18n,
     pkg::Kind,
@@ -43,6 +43,10 @@ pub struct QueueView {
     toast: Option<(String, f64)>,
     pub confirm_remove: Option<String>,
     pub details: Option<String>,
+    /// Row "Choose…" on an already-installed item → dialog 4.7.
+    pub decide: Option<String>,
+    /// Toolbar [⋯] → "Uninstall by ID…" (dialog 4.12).
+    pub by_id_request: bool,
 }
 
 /// What the view asks the app to do outside of engine commands.
@@ -220,6 +224,15 @@ impl QueueView {
             {
                 let _ = tx.send(Command::ClearFinished);
             }
+            ui.menu_button(
+                fonts::icon_rt("\u{e1fe}", size::HEADING).color(p.text_secondary),
+                |ui| {
+                    if ui.button(t.t("uninstall.by_id")).clicked() {
+                        self.by_id_request = true;
+                        ui.close();
+                    }
+                },
+            );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let open: Vec<&&Item> = items
                     .iter()
@@ -445,7 +458,20 @@ impl QueueView {
         } else if down && si + 1 < items.len() {
             self.selected = Some(items[si + 1].id.clone());
         }
-        if del {
+        let shift = ui.input(|i| i.modifiers.shift);
+        if del && shift {
+            // Shift+Delete: uninstall from the console (always confirmed, DESIGN 12)
+            let busy = items
+                .iter()
+                .any(|o| o.state.is_active() && o.title_id == it.title_id);
+            if matches!(
+                it.state,
+                State::Ready | State::Done | State::Skipped | State::Failed | State::Cancelled
+            ) && !busy
+            {
+                let _ = tx.send(Command::CheckInstalled(super::dialogs::target_for(it)));
+            }
+        } else if del {
             self.remove(it, tx);
         }
         if space {
@@ -828,25 +854,9 @@ impl QueueView {
                 }
             }
             State::AwaitingDecision => {
-                // shortcut: inline choice; Faza 4 replaces it with dialog 4.7 (Skip default, apply-to-all)
-                if btn(
-                    ui,
-                    BKind::Danger,
-                    icon::ARROWS_CLOCKWISE,
-                    &t.t("act.reinstall"),
-                ) {
-                    let _ = tx.send(Command::Decide {
-                        id: id.clone(),
-                        decision: Decision::Reinstall,
-                        apply_all: false,
-                    });
-                }
-                if btn(ui, BKind::Secondary, icon::SKIP, &t.t("act.skip")) {
-                    let _ = tx.send(Command::Decide {
-                        id,
-                        decision: Decision::Skip,
-                        apply_all: false,
-                    });
+                // opens dialog 4.7 (also opened automatically when the engine asks)
+                if btn(ui, BKind::Secondary, icon::WARNING, &t.t("act.decide")) {
+                    self.decide = Some(id);
                 }
             }
             State::Failed | State::Cancelled | State::Skipped => {
@@ -916,10 +926,29 @@ impl QueueView {
             ui.close();
         }
         ui.separator();
+        let busy = items
+            .iter()
+            .any(|o| o.state.is_active() && o.title_id == it.title_id);
+        let allowed = matches!(
+            it.state,
+            State::Ready | State::Done | State::Skipped | State::Failed | State::Cancelled
+        ) && !busy;
+        let r = ui.add_enabled(allowed, egui::Button::new(t.t("uninstall.menu")));
+        if busy {
+            r.clone().on_disabled_hover_text(t.t("uninstall.busy"));
+        }
+        if r.clicked() {
+            let _ = tx.send(Command::CheckInstalled(super::dialogs::target_for(it)));
+            ui.close();
+        }
         if ui.button(t.t("act.remove")).clicked() {
             self.remove(it, tx);
             ui.close();
         }
+    }
+
+    pub fn texture_of(&self, id: &str) -> Option<egui::TextureHandle> {
+        self.textures.get(id).cloned()
     }
 
     fn empty_state(&mut self, ui: &mut Ui, p: &Palette, t: &I18n, hovering: usize) {

@@ -4,6 +4,10 @@ use pspp::{app::App, config, logging::Logger, storage};
 
 fn main() -> eframe::Result {
     let args: Vec<String> = std::env::args().collect();
+    // elevated firewall helper (DESIGN 9.8): no UI, exits right away
+    if let Some(code) = pspp::firewall::run_cli(&args) {
+        std::process::exit(code);
+    }
     let debug = args.iter().any(|a| a == "--debug");
     let arg = |name: &str| {
         args.iter()

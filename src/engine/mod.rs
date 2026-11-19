@@ -140,6 +140,7 @@ struct Engine {
     next_batch: u64,
     awake: bool,
     banner: Option<Banner>,
+    uninstall_prev: HashMap<String, State>,
 }
 
 fn unix_now() -> u64 {
@@ -184,6 +185,7 @@ impl Engine {
             next_batch: 0,
             awake: false,
             banner: None,
+            uninstall_prev: HashMap::new(),
         };
         e.load();
         e
@@ -497,6 +499,9 @@ impl Engine {
             Command::AddPaths(paths) => self.add_paths(paths),
             Command::Parsed { id, result } => self.parsed(id, *result),
             Command::Precheck { id, exists } => self.precheck_result(&id, exists),
+            Command::CheckInstalled(target) => self.check_installed(target),
+            Command::Uninstall(target) => self.uninstall(target),
+            Command::UninstallDone { target, result } => self.uninstall_done(target, result),
             Command::Remove(id) => {
                 if let Some(i) = self.idx(&id) {
                     if self.items[i].state.is_active() {
@@ -834,6 +839,100 @@ impl Engine {
                 }
             }
         });
+    }
+
+    fn background_client(&self) -> Option<Client> {
+        self.console()
+            .map(|ip| Client::new(ip, self.o.config.console_port, self.o.dialect.clone()))
+    }
+
+    /// `is_exists` off the engine thread; DLC is checked by its Content ID ([PROVJERA] 14.1/2).
+    fn check_installed(&mut self, target: commands::UninstallTarget) {
+        let Some(c) = self.background_client() else {
+            self.set_banner(Some(Banner::ConsoleNotConfigured));
+            return;
+        };
+        let (events, notify) = (self.events.clone(), self.notify.clone());
+        thread::spawn(move || {
+            let result = c
+                .is_exists(&target.id)
+                .0
+                .map(|e| e.exists)
+                .map_err(|e| e.to_string());
+            let _ = events.send(Event::InstalledResult { target, result });
+            notify();
+        });
+    }
+
+    /// Standalone uninstall (DESIGN 6.7). The item shows `Uninstalling` and returns to its state.
+    fn uninstall(&mut self, target: commands::UninstallTarget) {
+        let Some(c) = self.background_client() else {
+            self.set_banner(Some(Banner::ConsoleNotConfigured));
+            return;
+        };
+        if let Some(i) = target.item.as_deref().and_then(|id| self.idx(id)) {
+            let prev = self.items[i].state;
+            if !self.set_state(i, Ev::UninstallBegin) {
+                return;
+            }
+            self.uninstall_prev.insert(self.items[i].id.clone(), prev);
+        }
+        let (tx, timings) = (self.self_tx.clone(), self.o.timings.clone());
+        thread::spawn(move || {
+            let result = run_uninstall(&c, &target, &timings);
+            let _ = tx.send(Command::UninstallDone { target, result });
+        });
+    }
+
+    fn uninstall_done(
+        &mut self,
+        target: commands::UninstallTarget,
+        result: Result<bool, ErrorReport>,
+    ) {
+        let label = format!("{:?} {}", target.kind, target.id);
+        match &result {
+            Ok(true) => {
+                self.o.log.info("engine", format!("uninstalled: {label}"));
+            }
+            Ok(false) => {
+                self.o
+                    .log
+                    .info("engine", format!("was not installed: {label}"));
+            }
+            Err(e) => {
+                let mut e = e.clone();
+                if let Some(c) = &self.client
+                    && let Ok(text) = c.console_log()
+                {
+                    e.console_log = self
+                        .o
+                        .log
+                        .write_console_log(0, &text)
+                        .map(|p| p.display().to_string());
+                }
+                self.o
+                    .log
+                    .error("engine", e.detail.clone())
+                    .code(e.code)
+                    .field("target", &label);
+            }
+        }
+        if let Some(i) = target.item.as_deref().and_then(|id| self.idx(id)) {
+            let prev = self
+                .uninstall_prev
+                .remove(&self.items[i].id)
+                .unwrap_or(State::Ready);
+            self.items[i].state = if result.is_ok() { State::Ready } else { prev };
+            if result.is_ok() {
+                self.items[i].pre = Some(queue::Pre::NotInstalled);
+                self.items[i].error = None;
+                self.items[i].decision = None;
+                self.items[i].finished_at = None;
+            }
+            self.dirty();
+            self.upsert(i);
+        }
+        self.emit(Event::UninstallResult { target, result });
     }
 
     fn precheck_result(&mut self, id: &str, exists: bool) {
@@ -1420,4 +1519,35 @@ fn parse_group(g: scan::Group) -> commands::ParseResult {
         ErrorReport::new(code, first.display().to_string()).with_technical(t)
     })?;
     Ok((info, parts, note))
+}
+
+/// Uninstall call + verification for games (DESIGN 6.7/5). Ok(false) = it was not installed (404).
+fn run_uninstall(
+    c: &Client,
+    t: &commands::UninstallTarget,
+    timings: &EngineTimings,
+) -> Result<bool, ErrorReport> {
+    let (r, ex) = c.uninstall(t.kind, &t.id);
+    match r {
+        Ok(_) => {}
+        Err(RpiError::Fail { status: 404, .. }) => return Ok(false),
+        Err(e) => return Err(ErrorReport::new(Code::Rpi08, e.to_string()).with_technical(ex.body)),
+    }
+    if t.kind != UninstallKind::Game {
+        return Ok(true);
+    }
+    for n in 0..timings.verify_tries {
+        if n > 0 {
+            thread::sleep(timings.verify_gap);
+        }
+        if let (Ok(e), _) = c.is_exists(&t.id)
+            && !e.exists
+        {
+            return Ok(true);
+        }
+    }
+    Err(ErrorReport::new(
+        Code::Rpi08,
+        "title still installed after uninstall",
+    ))
 }

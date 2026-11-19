@@ -4,14 +4,14 @@ use pspp::{
     config::Config,
     engine::{
         self, EngineOptions, EngineTimings,
-        commands::{Command, Event},
+        commands::{Command, Event, UninstallTarget},
         queue::{Decision, Item, State},
     },
     errors::Code,
     logging::Logger,
     mock::{Mock, MockConfig},
     pkg::fixture::Fixture,
-    rpi::RpiDialect,
+    rpi::{RpiDialect, UninstallKind},
 };
 use std::{
     collections::HashMap,
@@ -28,6 +28,8 @@ struct T {
     items: HashMap<String, Item>,
     order: Vec<String>,
     asked: Vec<String>,
+    installed: Vec<(String, Result<bool, String>)>,
+    uninstalled: Vec<(String, Result<bool, Code>)>,
     dir: PathBuf,
     join: Option<std::thread::JoinHandle<()>>,
 }
@@ -101,6 +103,8 @@ fn start_port(dir: PathBuf, mock: Mock, persist: bool, server_port: u16) -> T {
         items: HashMap::new(),
         order: vec![],
         asked: vec![],
+        installed: vec![],
+        uninstalled: vec![],
         dir,
         join: Some(h.join),
     }
@@ -122,6 +126,12 @@ impl T {
                 }
                 Event::Order(o) => self.order = o,
                 Event::AskDecision(id) => self.asked.push(id),
+                Event::InstalledResult { target, result } => {
+                    self.installed.push((target.id, result))
+                }
+                Event::UninstallResult { target, result } => self
+                    .uninstalled
+                    .push((target.id, result.map_err(|e| e.code))),
                 _ => {}
             }
         }
@@ -442,5 +452,91 @@ fn invalid_inputs() {
     std::thread::sleep(Duration::from_millis(200));
     t.pump();
     assert_eq!(t.items.len(), 3);
+    t.stop();
+}
+
+#[test]
+fn standalone_uninstall_item_and_by_id() {
+    let mut t = start(
+        "uninst",
+        MockConfig {
+            installed: vec![
+                "CUSA00060".into(),
+                "CUSA00061".into(),
+                "UP0000-CUSA00061_00-DLCXXXXXXXXXXXXX".into(),
+            ],
+            ..Default::default()
+        },
+        false,
+    );
+    let p = pkg(&t.dir.clone(), "g.pkg", Fixture::game("CUSA00060"));
+    t.add(vec![p], 1);
+    let id = t.items.keys().next().unwrap().clone();
+    let target = UninstallTarget {
+        kind: UninstallKind::Game,
+        id: "CUSA00060".into(),
+        item: Some(id.clone()),
+    };
+    t.tx.send(Command::CheckInstalled(target.clone())).unwrap();
+    t.wait("check answered", |t| !t.installed.is_empty());
+    assert_eq!(t.installed[0], ("CUSA00060".into(), Ok(true)));
+    t.tx.send(Command::Uninstall(target)).unwrap();
+    t.wait("uninstalled", |t| !t.uninstalled.is_empty());
+    assert_eq!(t.uninstalled[0], ("CUSA00060".into(), Ok(true)));
+    assert_eq!(t.items[&id].state, State::Ready);
+    assert!(!t.mock.installed().contains(&"CUSA00060".to_string()));
+    // by ID: DLC by Content ID, then a title that is not installed (404 → Ok(false))
+    t.tx.send(Command::Uninstall(UninstallTarget {
+        kind: UninstallKind::Dlc,
+        id: "UP0000-CUSA00061_00-DLCXXXXXXXXXXXXX".into(),
+        item: None,
+    }))
+    .unwrap();
+    t.tx.send(Command::Uninstall(UninstallTarget {
+        kind: UninstallKind::Game,
+        id: "CUSA09999".into(),
+        item: None,
+    }))
+    .unwrap();
+    t.wait("two more results", |t| t.uninstalled.len() == 3);
+    assert!(
+        t.uninstalled
+            .contains(&("UP0000-CUSA00061_00-DLCXXXXXXXXXXXXX".into(), Ok(true)))
+    );
+    assert!(t.uninstalled.contains(&("CUSA09999".into(), Ok(false))));
+    t.stop();
+}
+
+#[test]
+fn decision_apply_to_all() {
+    let mut t = start(
+        "applyall",
+        MockConfig {
+            installed: vec!["CUSA00070".into(), "CUSA00071".into()],
+            ..Default::default()
+        },
+        false,
+    );
+    let d = t.dir.clone();
+    let mut a = Fixture::game("CUSA00070");
+    a.title = "A".into();
+    let mut b = Fixture::game("CUSA00071");
+    b.title = "B".into();
+    t.add(vec![pkg(&d, "a.pkg", a), pkg(&d, "b.pkg", b)], 2);
+    t.tx.send(Command::StartQueue).unwrap();
+    t.wait("first asks", |t| {
+        t.state("A") == Some(State::AwaitingDecision)
+    });
+    let a_id = t.by_title("A").id.clone();
+    t.tx.send(Command::Decide {
+        id: a_id,
+        decision: Decision::Skip,
+        apply_all: true,
+    })
+    .unwrap();
+    t.wait("both skipped without a second question", |t| {
+        t.state("A") == Some(State::Skipped) && t.state("B") == Some(State::Skipped)
+    });
+    assert_eq!(t.asked.len(), 1);
     t.stop();
 }

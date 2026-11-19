@@ -169,6 +169,8 @@ impl SettingsView {
         server: Option<SocketAddrV4>,
         busy: bool,
         data_dir: &std::path::Path,
+        fw: &mut super::dialogs::Firewall,
+        show_guide: &mut bool,
     ) -> Option<Config> {
         let mut saved = None;
         let now = ui.input(|i| i.time);
@@ -377,6 +379,11 @@ impl SettingsView {
                             ));
                         }
                         _ => {}
+                    }
+                    // firewall rule for the server port (DESIGN 4.5, 9.8)
+                    let port = Draft::port(&self.draft.server_port).unwrap_or(cfg.server_port);
+                    if fw.row(ui, p, t, port, false) {
+                        *show_guide = true;
                     }
                 });
                 widgets::space(ui, 3);
