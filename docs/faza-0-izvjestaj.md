@@ -4,7 +4,7 @@ Datum: 2026-11-19 · Mašina: dev laptop, Windows 11 (build 26300), AMD Radeon i
 
 | Spike | Pitanje | Rezultat | Prijedlog odluke |
 |---|---|---|---|
-| S-1 | Splash → glavni prozor (preobražaj root viewporta) | Radi: 480×300 bez okvira i transparentan → 1100×700 sa okvirom, centrirano (`Transparent(false)`, `Decorations(true)`, `Resizable`, `MinInnerSize`, `InnerSize`, `OuterPosition`). Treperenje **nije ocijenjeno okom** — čeka vlasnika. | Preobražaj (ne `show_viewport_deferred`), ako vlasnik ne vidi bljesak |
+| S-1 | Splash → glavni prozor (preobražaj root viewporta) | Radi: 480×300 bez okvira i transparentan → 1100×700 sa okvirom, centrirano (`Transparent(false)`, `Decorations(true)`, `Resizable`, `MinInnerSize`, `InnerSize`, `OuterPosition`). Vlasnik vizuelno potvrdio: OK, bez treperenja. | Preobražaj (ne `show_viewport_deferred`), ako vlasnik ne vidi bljesak |
 | S-1/S-7 | Renderer glow vs wgpu, fps | glow: ~25–27 fps, wgpu: ~30 fps uz stalni repaint na ovoj mašini (ekran 60 Hz). Isto i za transparentan i neprozirni prozor. Uzrok nepoznat (iGPU/frame pacing); **[PROVJERA]** na kućnom računaru. | **glow** (manji exe, razlika u fps zanemariva) |
 | S-2 | Windows tema | `ctx.system_theme()` vraća `Dark` odmah na startu. Promjena teme uživo **nije testirana** (traži promjenu sistemske postavke) — čeka vlasnika. `SPI_GETCLIENTAREAANIMATION` čitanje radi (`true`). | `ThemePreference::System` + rezerva iz DESIGN 9.7 ako živa promjena ne stigne |
 | S-3 | Repaint u mirovanju | **0 frame-ova** nakon završetka animacije (debug i release). | Potvrđeno, bez izmjena |
@@ -39,4 +39,6 @@ Datum: 2026-11-19 · Mašina: dev laptop, Windows 11 (build 26300), AMD Radeon i
 
 Prihvaćeno: glow renderer, vlastiti HTTP server (bez `tiny_http`), egui/eframe 0.37 sa direktno ugrađenim Phosphor 2.1.2 TTF (`assets/fonts/`, MIT), logo i ikone iz 0.6. Upisano u DESIGN 7.1, 9.4, 14.3/23.
 
-Otvoreno do zatvaranja CP-0: vizuelna provjera splasha i žive promjene teme (S-1/S-2), firewall test (S-5), stvarni pkg fajlovi (S-6).
+S-1 splash: vlasnik potvrdio OK. Spike grane obrisane (rezultati u ovom izvještaju).
+
+Otvoreno do zatvaranja CP-0: živa promjena teme (S-2), firewall test (S-5), stvarni pkg fajlovi (S-6).
