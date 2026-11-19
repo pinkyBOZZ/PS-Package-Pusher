@@ -69,6 +69,7 @@ struct State {
     dir: Option<PathBuf>,
     file: Option<(String, u32, File)>,
     ring: VecDeque<Entry>,
+    pushed: u64,
 }
 
 /// Cheap to clone; shared by all threads.
@@ -98,6 +99,7 @@ impl Logger {
                 dir,
                 file: None,
                 ring: VecDeque::new(),
+                pushed: 0,
             })),
             debug,
             profile,
@@ -177,6 +179,16 @@ impl Logger {
             st.ring.pop_front();
         }
         st.ring.push_back(e);
+        st.pushed += 1;
+    }
+
+    /// Increases with every entry; the UI re-reads the ring only when it changed.
+    pub fn generation(&self) -> u64 {
+        self.lock().pushed
+    }
+
+    pub fn dir(&self) -> Option<PathBuf> {
+        self.lock().dir.clone()
     }
 }
 

@@ -1,2 +1,8 @@
 Phosphor.ttf  @phosphor-icons/web 2.1.2, src/regular/Phosphor.ttf (unpkg), MIT, see Phosphor-LICENSE.txt
 sha256 06b91e022b7ee899a63efced879392a74f0bacbda54e4467e9f663220d173a10
+Inter-Regular.ttf  rsms/inter v4.1 release (Inter-4.1.zip extras/ttf), OFL 1.1, see Inter-OFL.txt
+sha256 40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82
+Inter-SemiBold.ttf  rsms/inter v4.1 release (Inter-4.1.zip extras/ttf), OFL 1.1, see Inter-OFL.txt
+sha256 78a843fade9d4612a5567302fb595b56976eb5fcebf4fea5a5912d638bafcde3
+Audiowide-Regular.ttf  google/fonts main ofl/audiowide, OFL 1.1, see Audiowide-OFL.txt
+sha256 c7c0f2b0f6fad8c623e31772ce79f94a4edb9321ffce9fce978ea892d20ae730
