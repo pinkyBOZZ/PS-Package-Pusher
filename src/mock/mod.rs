@@ -449,6 +449,7 @@ impl Mock {
         }
         let mut header: Option<Vec<u8>> = None;
         let mut done = 0u64;
+        let mut last_ok = Instant::now();
         for (u, size) in urls.iter().zip(sizes) {
             let mut off = 0;
             while off < size {
@@ -471,13 +472,18 @@ impl Mock {
                 }
                 let end = (off + self.cfg.chunk).min(size) - 1;
                 let t0 = Instant::now();
-                let got = fetch(u, "GET", Some((off, end)), self.cfg.stall_timeout);
-                let Some((206, _, body)) = got else {
-                    return self.set_state(id, TaskState::Error(STALL_CODE));
+                // like RPI: keep retrying while the PC is gone, give up after stall_timeout (DESIGN 8.1)
+                let body = match fetch(u, "GET", Some((off, end)), self.cfg.stall_timeout) {
+                    Some((206, _, b)) if b.len() as u64 == end - off + 1 => {
+                        last_ok = Instant::now();
+                        b
+                    }
+                    _ if last_ok.elapsed() < self.cfg.stall_timeout => {
+                        thread::sleep(Duration::from_millis(100));
+                        continue;
+                    }
+                    _ => return self.set_state(id, TaskState::Error(STALL_CODE)),
                 };
-                if body.len() as u64 != end - off + 1 {
-                    return self.set_state(id, TaskState::Error(STALL_CODE));
-                }
                 if header.is_none() {
                     header = Some(body.clone());
                 }
