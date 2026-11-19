@@ -1103,8 +1103,15 @@ netsh advfirewall firewall add rule name="PS Package Pusher" dir=in action=allow
 - Dodavanje: aplikacija pokreće **samu sebe** elevirano (`ShellExecuteExW`, verb `runas`) sa `--firewall add <port>`; UAC prozor pokazuje "PS Package Pusher". Elevirani proces nema UI: izvede `netsh … delete rule name="PS Package Pusher"` (briše staro, ignoriše "nema pravila") pa `add rule …` preko `std::process::Command` (bez `cmd.exe`, bez interpolacije stringova u shell), vrati exit kod i završi. Glavni proces čeka (pozadinska nit) i osvježava stanje.
 - Uklanjanje: `--firewall remove` → samo `delete rule`.
 - Promjena porta lokalnog servera dok pravilo postoji → red u Postavkama nudi "Ažuriraj pravilo" (isti postupak kao dodavanje).
-- **Čitanje stanja** (bez admin prava, pozadinska nit, timeout 10 s): `powershell -NoProfile -NonInteractive -Command` sa `Get-NetFirewallRule -DisplayName 'PS Package Pusher'` + `Get-NetFirewallPortFilter` + `Get-NetFirewallApplicationFilter` → `ConvertTo-Json` (nezavisno od jezika Windowsa, za razliku od `netsh show`). Također `Get-NetFirewallProfile -PolicyStore ActiveStore` → `AllowLocalFirewallRules`; ako je `False` (politika firme), lokalna pravila nemaju efekta i UI to kaže umjesto dugmeta. **[PROVJERA]** trajanje i pouzdanost čitanja (spike S-5).
+- **Čitanje stanja** (bez admin prava, pozadinska nit, timeout 10 s): `powershell -NoProfile -NonInteractive -Command` sa `Get-NetFirewallRule -DisplayName 'PS Package Pusher'` + `Get-NetFirewallPortFilter` + `Get-NetFirewallApplicationFilter` → `ConvertTo-Json` (nezavisno od jezika Windowsa, za razliku od `netsh show`). Također `Get-NetFirewallProfile -PolicyStore ActiveStore` → `AllowLocalFirewallRules`; ako je `False` (politika firme), lokalna pravila nemaju efekta i UI to kaže umjesto dugmeta. Čitanje traje ~2–3 s (izmjereno S-5) — samo u pozadini, nikad blokira UI.
 - Ne mijenja se ništa drugo (profili, default akcije, mrežna kategorija). Ako je mreža "Public", UI to samo napomene sa uputom (4.9 korak 2).
+
+**Nalazi S-5 (2026-11-19):**
+
+- `program=` mora biti puna kanonska putanja (`std::fs::canonicalize`, bez `\\?\` prefiksa); 8.3 skraćena putanja (npr. `C:\Users\KORISN~1\...`) daje grešku "The application name could not be resolved".
+- `netsh delete rule` vraća exit 1 kad pravilo ne postoji — tretira se kao uspjeh (nije FW-03).
+- Na upravljanim računarima politika može isključiti `NotifyOnListen` za sve profile: Windowsov prompt se tada **nikad** ne pojavi, pa je ovo dugme jedini put. `Get-NetFirewallProfile -PolicyStore ActiveStore` → `NotifyOnListen` se čita uz stanje pravila i prikazuje u uputi 4.9.
+- Pravilo je samo za **Private** profil; ako je aktivna mreža `Domain` ili `Public`, red u Postavkama to kaže (pravilo postoji, ali ne važi na trenutnoj mreži).
 
 **Ishodi:**
 
@@ -1287,7 +1294,7 @@ ps-package-pusher/
 
 20. Preobražaj splash → glavni prozor bez treperenja (transparentnost, DWM zaobljenje, DPI); rezervna varijanta sa drugim viewportom.
 21. Živa promjena Windows teme kroz eframe; tamna naslovna traka.
-22. Da li Windows Firewall prompt dolazi pri bindu na konkretan LAN IP (očekivano da) i za nepotpisan exe.
+22. Windows Firewall prompt: na dev računaru (upravljan, `NotifyOnListen=False`) ne dolazi — očekivano; normalan prompt na kućnom računaru ostaje za Sesiju B (B2). Naše pravilo preko UAC potvrđeno (9.8 nalazi).
 23. ~~`tiny_http`~~ — riješeno spike-om S-4: vlastiti server (Range > 4 GB, 416, keep-alive, timeouti, limit, tiho odbijanje IP-a potvrđeni na loopbacku).
 24. AccessKit + Narrator: koliko je UI čitljiv.
 25. Veličina release exe-a (cilj < 15 MB sa fontovima).
