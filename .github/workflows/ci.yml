@@ -1,9 +1,12 @@
 name: ci
 
+# docs/images-only changes skip the build; privacy.yml still checks every push
 on:
   push:
     branches: [main]
+    paths-ignore: ["**.md", "docs/**", "assets/logo/**", ".github/ISSUE_TEMPLATE/**"]
   pull_request:
+    paths-ignore: ["**.md", "docs/**", "assets/logo/**", ".github/ISSUE_TEMPLATE/**"]
 
 permissions:
   contents: read
@@ -28,12 +31,6 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
-      - name: Privacy check (no real user profile paths in tracked files)
-        shell: bash
-        run: |
-          if git grep -n -I -E '[A-Za-z]:[\\/]+Users[\\/]+[A-Za-z0-9._~-]+' -- . | grep -v -F -e 'KORISN~1' -e 'Someone'; then
-            echo "::error::a real user profile path is committed"; exit 1
-          fi
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
