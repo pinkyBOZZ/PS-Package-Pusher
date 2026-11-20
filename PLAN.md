@@ -74,7 +74,7 @@ Pinuje se u `Cargo.lock` na početku Faze 1, nakon odluka iz Faze 0.
 | `serde`, `serde_json` | 1.x / 1.0.154 | — |
 | `cargo-about` | 0.9.3 | alat, ne crate projekta |
 
-`rust-toolchain.toml` pinuje `1.99.1` + clippy/rustfmt, da CI i lokalni build koriste isti kompajler.
+`rust-toolchain.toml` pinuje `1.100.0` (bilo `1.99.1`, ažurirano 2026-11-20) + clippy/rustfmt, da CI i lokalni build koriste isti kompajler.
 
 ---
 
