@@ -55,6 +55,6 @@ jobs:
         run: |
           pre=""
           case "$VERSION" in *-*) pre="--prerelease" ;; esac
-          notes=$(awk -v v="$VERSION" '$0 ~ "^## \\[?"v {f=1; next} /^## / {f=0} f' CHANGELOG.md)
+          notes=$(awk -v v="$VERSION" 'index($0, "## " v) == 1 {f=1; next} /^## / {f=0} f' CHANGELOG.md)
           gh release create "$GITHUB_REF_NAME" "$ZIP" SHA256SUMS.txt --draft $pre \
             --title "PS Package Pusher $VERSION" --notes "${notes:-See CHANGELOG.md}"
