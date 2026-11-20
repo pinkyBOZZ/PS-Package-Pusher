@@ -2194,7 +2194,7 @@ checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 
 [[package]]
 name = "ps-package-pusher"
-version = "0.0.1-alpha.4"
+version = "0.0.1-rc.1"
 dependencies = [
  "eframe",
  "image",
