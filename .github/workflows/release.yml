@@ -1,0 +1,60 @@
+name: release
+
+# Tag v0.0.x (or v0.0.x-rc.N) → build, zip, SHA256, draft GitHub release.
+# The owner reviews the draft and publishes it by hand (PLAN 7.1, DESIGN 13.2).
+on:
+  push:
+    tags: ["v0.0.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+      - name: Tag must match Cargo.toml version
+        shell: bash
+        run: |
+          cargo_ver=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+          tag="${GITHUB_REF_NAME#v}"
+          echo "tag=$tag cargo=$cargo_ver"
+          [ "$tag" = "$cargo_ver" ] || { echo "::error::tag v$tag does not match Cargo.toml $cargo_ver"; exit 1; }
+          echo "VERSION=$tag" >> "$GITHUB_ENV"
+      - name: Test
+        run: cargo test
+      - name: Build
+        run: cargo build --release --bin ps-package-pusher
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about@0.9.3
+      - name: Third-party licenses
+        shell: bash
+        run: |
+          cargo about generate about.hbs -o THIRD-PARTY-LICENSES.txt
+          for f in assets/fonts/Inter-OFL.txt assets/fonts/Audiowide-OFL.txt assets/fonts/Phosphor-LICENSE.txt; do
+            printf '\n----------------------------------------------------------------------\n%s\n\n' "$(basename "$f")" >> THIRD-PARTY-LICENSES.txt
+            cat "$f" >> THIRD-PARTY-LICENSES.txt
+          done
+      - name: Package
+        shell: bash
+        run: |
+          name="PS-Package-Pusher-${VERSION}-win-x64"
+          mkdir "$name"
+          cp target/release/ps-package-pusher.exe LICENSE README.md THIRD-PARTY-LICENSES.txt "$name/"
+          7z a -tzip "$name.zip" "$name" > /dev/null
+          sha256sum "$name.zip" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          echo "ZIP=$name.zip" >> "$GITHUB_ENV"
+      - name: Draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pre=""
+          case "$VERSION" in *-*) pre="--prerelease" ;; esac
+          notes=$(awk -v v="$VERSION" '$0 ~ "^## \\[?"v {f=1; next} /^## / {f=0} f' CHANGELOG.md)
+          gh release create "$GITHUB_REF_NAME" "$ZIP" SHA256SUMS.txt --draft $pre \
+            --title "PS Package Pusher $VERSION" --notes "${notes:-See CHANGELOG.md}"
