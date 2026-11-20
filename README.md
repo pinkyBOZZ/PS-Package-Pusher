@@ -3,7 +3,7 @@
 <h1 align="center">PS Package Pusher</h1>
 
 <p align="center"><b>Send PS4 <code>.pkg</code> files from your Windows PC to a jailbroken PS4 — drag, drop, install.</b><br>
-<sub>A desktop companion for Remote PKG Installer 3.58 with a queue, checks before every install and clear errors.</sub></p>
+<sub>A Windows PKG sender / PC client for Remote PKG Installer 3.58 on GoldHEN or HEN: install PS4 games, updates and DLC over your local network, with a queue, checks before every install and clear errors.</sub></p>
 
 <p align="center">
   <a href="https://github.com/pinkyBOZZ/PS-Package-Pusher/actions/workflows/ci.yml"><img src="https://github.com/pinkyBOZZ/PS-Package-Pusher/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
