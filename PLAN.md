@@ -1,6 +1,6 @@
 # PS Package Pusher — PLAN izrade
 
-Status: nacrt plana za v0.0.1 · Datum: 2026-11-19 · Jezik: bosanski (tehnički termini na engleskom)
+Status: plan odobren, rad u Fazi 6 (Sesija B + popravke) · Faze 0–5 završene (tagovi alpha.1–alpha.4, rc.1) · priprema Faze 7 završena · Sesija A završena 2026-11-21 · verzija rc.4 plus nekomitovane popravke · Datum: 2026-11-21 · Jezik: bosanski (tehnički termini na engleskom)
 
 Izvor istine za zahtjeve je `DESIGN.md`; ovaj plan ga ne ponavlja nego referencira sekcije ("DESIGN 6.2"). Plan opisuje put od praznog foldera do javnog GitHub releasea `0.0.1`.
 
@@ -722,4 +722,4 @@ Sva pitanja su odlučena 2026-11-19:
 | Q7 | Windows 10 | nema okruženja → službeno **samo Windows 11** |
 | Q8 | Upis PKG nalaza u DESIGN | **da**, upisano (DESIGN 9.5, 14.2) |
 
-Preostaje samo **CP-P**: odobrenje ovog plana i početak Faze 0.
+Trenutno stanje (2026-11-21): tag `v0.0.1-rc.4` je na HEAD-u; popravke (zaostali task na konzoli, ETA kolona, automatski indikator konzole) su nekomitovane. Sljedeće: Sesija B na RC buildu, uslov za CP-6.

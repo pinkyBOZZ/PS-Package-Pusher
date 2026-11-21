@@ -100,7 +100,7 @@ sequenceDiagram
 1. Download `PS-Package-Pusher-<version>-win-x64.zip` from [Releases](../../releases), unzip it and start `ps-package-pusher.exe`.
 2. Allow the firewall (see below) when the app or Windows asks.
 3. On the PS4 start **Remote PKG Installer**; note the IP shown on the TV.
-4. In **Settings** enter that IP (`12801` stays) and press **Test connection** (`F5`).
+4. In **Settings** enter that IP (`12801` stays) and press **Test connection** (`F5`). The app also checks the connection at startup and after you save Settings; the header shows the console state.
 5. Drop your `.pkg` files on the window and press **Start queue** (`Ctrl+Enter`).
 
 ### 🔥 Windows Firewall
@@ -151,7 +151,7 @@ Every error has a code; the app shows the full explanation (and the console log 
 | `PKG-05` | This package is already in the queue (#<pos>). | No action needed. |
 | `PKG-06` | Unknown package type <category>. | Installing is possible at your own risk. |
 | `PKG-07` | The file changed or disappeared after it was added. | Remove the item and add it again. |
-| `RPI-01` | The console refused the installation: <detail> | See the console log in the details. |
+| `RPI-01` | The console refused the installation: <detail> | See the console log in the details. If the detail is `0x80990015`, an old download of this package is still on the console (older builds could leave it): delete it in Notifications → Downloads and try again. |
 | `RPI-02` | Checking whether the title is installed failed. | Nothing is installed without this check. Try again. |
 | `RPI-04` | Download/installation was aborted, code <detail>. | See the code explanation and the console log. |
 | `RPI-05` | The transfer stopped (no progress for <secs> s). | Check the console (rest mode, free space) and try again. |

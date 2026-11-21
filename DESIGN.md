@@ -293,7 +293,7 @@ Zaglavlje (uvijek vidljivo):
 ```
 
 - Brojač uz "Red čekanja" = broj nezavršenih stavki; uz "Log" = broj nepročitanih grešaka (badge `danger`).
-- Indikator konzole: ikona + tekst — "Povezano", "Nedostupna", "Nije podešeno", "Provjeravam…". Ažurira se pri startu, nakon "Test veze" i iz rezultata svakog API poziva; nema periodičnog pinganja. Klik vodi na Postavke.
+- Indikator konzole: ikona + tekst — "Povezano", "Nedostupna", "Nije podešeno", "Provjeravam…". Ažurira se pri startu, nakon snimanja Postavki, nakon "Test veze" i iz rezultata svakog API poziva; nema periodičnog pinganja. Klik vodi na Postavke.
 - Globalni banner (ispod zaglavlja, iznad sadržaja taba) za stanja koja blokiraju rad: port zauzet, PC IP nepoznat, konzola nije podešena. Banner ima dugme za akciju ("Otvori Postavke").
 
 ---
@@ -752,6 +752,7 @@ Pokreće se samo kroz odluku "Reinstaliraj" (dijalog 4.7, sa ili bez "primijeni 
 2. Za greške u kojima je konzola učestvovala (RPI-01, -04, -05, -06, -08) engine povlači `/api/log` (timeout 5 s, zadnjih 200 linija) i prilaže ga. Neuspjeh povlačenja je samo napomena u izvještaju.
 3. Log unos nivoa ERROR, brojač na tabu Log, status reda "Greška: <what>".
 4. Dijalog greške se **ne** otvara automatski dok red radi (ne prekida rad); otvara se klikom/dvoklikom ili iz Loga. Izuzetak: globalne greške (port zauzet, konzola nestala pri pokretanju reda) — banner + zaustavljen red.
+5. Ako je greška nastala nakon što je konzola već registrovala task (`task_id`), engine na konzoli zove `stop_task` pa `unregister_task` i briše `task_id` iz stavke, osim za RPI-07 (task ostaje da bi "Pokušaj ponovo" mogao nastaviti); zaostali task inače čini da konzola odbija sljedeću instalaciju istog paketa sa 0x80990015 (viđeno na PS4, 2026-11-21).
 
 ### 6.5 Test veze
 
@@ -891,7 +892,8 @@ tests/ (integracioni testovi sa mock serverom)
 - **Engine** je jedini vlasnik stanja reda i jedini koji piše `queue.json`. Petlja: `recv_timeout(1 s)` → obradi komandu ili tick (polling progressa aktivne stavke, stall detekcija). RPI pozivi imaju timeout connect 2 s / read 5 s, pa komanda (npr. Pauziraj) čeka najviše ~7 s u najgorem slučaju; UI odmah prikazuje "Pauziram…" (optimistički pending status na dugmetu).
 - Svaki `Event` koji mijenja prikaz prati `ctx.request_repaint()`.
 - Komande: `AddPaths`, `Remove(id)`, `Move(id, to)`, `StartQueue`, `StopAfterCurrent`, `Pause(id)`, `Resume(id)`, `Cancel(id)`, `Decide(id, Skip|Reinstall, apply_all)`, `Retry(id)`, `CheckInstalled(kind, id)`, `Uninstall(target)`, `TestConnection`, `ApplySettings(Config)`, `ClearFinished`, `Shutdown`.
-- Događaji: `ItemUpsert(ItemView)`, `ItemRemoved(id)`, `Order(Vec<id>)`, `AskDecision(id)`, `Log(LogEntry)`, `ConsoleStatus`, `ServerStatus`, `TestResult(Vec<CheckLine>)`, `InstalledResult(kind, id, bool)`, `AskUninstallConfirm(target)`, `UninstallResult(target, Result)`, `SplashStep(n, key)`, `Banner(Option<BannerKind>)`.
+- Događaji: `ItemUpsert(ItemView)`, `ItemRemoved(id)`, `Order(Vec<id>)`, `AskDecision(id)`, `Log(LogEntry)`, `ConsoleStatus(Option<u32>)`, `ServerStatus`, `TestResult(Vec<CheckLine>)`, `InstalledResult(kind, id, bool)`, `AskUninstallConfirm(target)`, `UninstallResult(target, Result)`, `SplashStep(n, key)`, `Banner(Option<BannerKind>)`.
+- `ConsoleStatus(Option<u32>)` se šalje samo kad konzola pređe iz dostupne u nedostupnu ili obrnuto, iz ishoda RPI poziva koje engine već pravi (svaki HTTP odgovor, pa i 403 ili `fail`, znači dostupna; samo greška transporta znači nedostupna), `Some(ms)` je vrijeme odgovora iz trenutka zadnje promjene, `None` nedostupna.
 
 ### 7.4 Gdje se šta čuva
 
