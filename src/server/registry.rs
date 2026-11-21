@@ -58,9 +58,11 @@ impl Registry {
             .retain(|(id, _), _| id != item_id);
     }
 
-    /// Exact match only; anything else is a 404.
+    /// Exact path match only; anything else is a 404. The query string is ignored:
+    /// the PS4 downloader appends `?downloadId=..&du=..&serverIpAddr=..&r=..`.
     pub fn lookup(&self, url_path: &str) -> Option<(String, Part)> {
-        let rest = url_path.strip_prefix("/pkg/")?;
+        let path = url_path.split_once('?').map_or(url_path, |(p, _)| p);
+        let rest = path.strip_prefix("/pkg/")?;
         let (id, name) = rest.split_once('/')?;
         let map = self.map.read().unwrap_or_else(|e| e.into_inner());
         map.get(&(id.to_string(), name.to_string()))
@@ -95,7 +97,11 @@ mod tests {
         );
         assert!(r.lookup(&urls[1]).is_some());
         assert!(r.lookup("/pkg/abc/../x.pkg").is_none());
-        assert!(r.lookup("/pkg/abc/UP0000-CUSA00001_00-X_0.pkg?x").is_none());
+        assert!(
+            r.lookup("/pkg/abc/UP0000-CUSA00001_00-X_0.pkg?downloadId=00000061&r=0")
+                .is_some()
+        );
+        assert!(r.lookup("/pkg/abc/../x.pkg?y").is_none());
         r.unregister("abc");
         assert!(r.lookup(&urls[0]).is_none());
     }

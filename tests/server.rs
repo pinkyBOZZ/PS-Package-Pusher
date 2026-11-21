@@ -124,11 +124,9 @@ fn range_over_4gb_and_errors() {
             .0
             .starts_with("HTTP/1.1 416")
     );
-    assert!(
-        get(a, &format!("{}?x=1", e.urls[0]), None)
-            .0
-            .starts_with("HTTP/1.1 404")
-    );
+    // the PS4 downloader appends a query string; it must still find the file
+    let q = format!("{}?downloadId=00000061&r=00000000", e.urls[0]);
+    assert!(get(a, &q, Some("bytes=0-3")).0.starts_with("HTTP/1.1 206"));
     assert!(
         get(a, "/pkg/item1/../big.pkg", None)
             .0

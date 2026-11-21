@@ -727,6 +727,8 @@ impl Engine {
                 }
                 if let Kind::Other(c) = info.kind()
                     && c != "?"
+                    && c != "gde"
+                // homebrew app: installs like a game, no warning
                 {
                     self.o
                         .log

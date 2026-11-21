@@ -473,7 +473,9 @@ impl Mock {
                 let end = (off + self.cfg.chunk).min(size) - 1;
                 let t0 = Instant::now();
                 // like RPI: keep retrying while the PC is gone, give up after stall_timeout (DESIGN 8.1)
-                let body = match fetch(u, "GET", Some((off, end)), self.cfg.stall_timeout) {
+                // the real BGFT appends a query string to the download GETs (Sesija A, RPI 3.58)
+                let q = format!("{u}?downloadId={id:08x}&du={id:016x}&r=00000000");
+                let body = match fetch(&q, "GET", Some((off, end)), self.cfg.stall_timeout) {
                     Some((206, _, b)) if b.len() as u64 == end - off + 1 => {
                         last_ok = Instant::now();
                         b
