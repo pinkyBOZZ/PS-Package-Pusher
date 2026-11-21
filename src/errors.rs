@@ -92,6 +92,21 @@ pub const CONSOLE_CODES: &[ConsoleCode] = &[
         key: "ce32809",
         verified: false,
     },
+    ConsoleCode {
+        code: "0x80990015",
+        key: "bgft80990015",
+        verified: true,
+    },
+    ConsoleCode {
+        code: "0x80990019",
+        key: "bgft80990019",
+        verified: true,
+    },
+    ConsoleCode {
+        code: "0x80991404",
+        key: "bgft80991404",
+        verified: true,
+    },
 ];
 
 pub fn lookup_console_code(code: &str) -> Option<&'static ConsoleCode> {

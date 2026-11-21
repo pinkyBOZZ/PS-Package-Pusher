@@ -170,7 +170,9 @@ Console error codes (`CE-…`, `0x8099…`) are explained where known; unknown o
 ## ⚠️ Known limitations
 
 - Remote PKG Installer has no "list installed titles" API, so uninstall works on items in the queue or on a typed Title ID / Content ID.
-- Some RPI 3.58 behaviour is not confirmed yet (exact JSON fields, whether reinstalling keeps save data); the app tolerates both known variants.
+- Some RPI 3.58 behaviour is not confirmed yet (whether reinstalling keeps save data); the app tolerates both known variants of the JSON fields.
+- Not tested on a console yet: split packages, save data after uninstall, rest mode during a transfer, a pulled network cable or removed USB disk during a transfer, and package types other than game, update and DLC.
+- Finished downloads stay in the PS4 Downloads list (Notifications → Downloads); remove them there by hand.
 - One console at a time; HTTP only on the local network (RPI does not support HTTPS).
 
 ## 🧰 Tech stack

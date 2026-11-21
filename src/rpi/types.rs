@@ -151,6 +151,7 @@ impl Progress {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::rpi::client::{RpiError, classify};
     use serde_json::json;
 
     #[test]
@@ -198,5 +199,73 @@ mod tests {
                 .exists
         );
         assert!(Exists::from_json(&json!({"status":"success"})).is_none());
+    }
+
+    /// Raw console answers from Sesija B (2026-11-21), see docs/faza-6-izvjestaj.md.
+    #[test]
+    fn sesija_b_console_fixtures() {
+        let j = |s: &str| serde_json::from_str::<Value>(s).unwrap();
+
+        let no = j(include_str!(
+            "../../tests/fixtures/rpi-3.58/sesija-B-2026-11-21/is_exists-not-installed.json"
+        ));
+        assert_eq!(
+            Exists::from_json(&no),
+            Some(Exists {
+                exists: false,
+                size: None,
+                version: None
+            })
+        );
+        let yes = j(include_str!(
+            "../../tests/fixtures/rpi-3.58/sesija-B-2026-11-21/is_exists-installed.json"
+        ));
+        assert_eq!(
+            Exists::from_json(&yes),
+            Some(Exists {
+                exists: true,
+                size: Some(9_328_275_456),
+                version: None
+            })
+        );
+        let upd = j(include_str!(
+            "../../tests/fixtures/rpi-3.58/sesija-B-2026-11-21/is_exists-with-update.json"
+        ));
+        assert_eq!(
+            Exists::from_json(&upd),
+            Some(Exists {
+                exists: true,
+                size: Some(11_889_328_128),
+                version: None
+            })
+        );
+
+        let fin = Progress::from_json(&j(include_str!(
+            "../../tests/fixtures/rpi-3.58/sesija-B-2026-11-21/progress-finished.json"
+        )));
+        assert_eq!(
+            (fin.transferred, fin.total, fin.percent, fin.error.clone()),
+            (Some(9_316_925_440), Some(9_316_925_440), Some(100.0), None)
+        );
+        assert!(fin.complete(0));
+        let mid = Progress::from_json(&j(include_str!(
+            "../../tests/fixtures/rpi-3.58/sesija-B-2026-11-21/progress-40.json"
+        )));
+        assert_eq!(
+            (mid.transferred, mid.total, mid.rest_sec),
+            (Some(3_772_186_624), Some(9_316_925_440), Some(83))
+        );
+        assert!((mid.fraction(0).unwrap() - 0.4).abs() < 1e-9);
+        assert!(!mid.complete(0));
+
+        // Known gap: the failure carries `error_code` (0x80990019), which classify does not read
+        // yet, so only the classification is asserted here. See docs/faza-6-izvjestaj.md.
+        let gone = include_str!(
+            "../../tests/fixtures/rpi-3.58/sesija-B-2026-11-21/progress-unknown-task.json"
+        );
+        assert!(matches!(
+            classify(200, gone),
+            Err(RpiError::Fail { status: 200, .. })
+        ));
     }
 }

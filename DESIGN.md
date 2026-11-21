@@ -641,7 +641,7 @@ Kolone/elementi reda:
 | `Uninstalling` | `uninstall_*` u toku (Reinstaliraj ili samostalna deinstalacija, 6.7) | "Deinstalira…", indeterminate | `ready` (samostalna: prethodno stanje) |
 | `Starting` | poslan `install`, čeka `task_id` / prve bajtove | "Pokreće se…", indeterminate | `ready` |
 | `Transferring` | konzola povlači fajl | "Šalje se", %, brzina, ETA; Pauziraj, Otkaži | `interrupted` |
-| `Installing` | prenos 100 %, konzola instalira (ako je detektabilno, **[PROVJERA]**) | "Instalira…", indeterminate; Otkaži | `interrupted` |
+| `Installing` | prenos 100 %, konzola instalira (zasebna faza nije bila potrebna, signal ~1 s nakon zadnjeg bajta, vidi 14.1/4) | "Instalira…", indeterminate; Otkaži | `interrupted` |
 | `Paused` | `pause_task` uspio | "Pauzirano", zamrznut progress; Nastavi, Otkaži | `interrupted` |
 | `Done` | završeno (i potvrđeno `is_exists` za igre) | "Završeno <vrijeme>"; Ukloni | `done` |
 | `Failed` | greška | "Greška: <jedna rečenica>"; Detalji, Pokušaj ponovo, Ukloni | `failed` + `error` |
@@ -736,8 +736,8 @@ Korisnik klikne "Pokreni red" (`Ctrl+Enter`). Za svaku stavku redom:
    - Nijedan HTTP zahtjev konzole ka serveru u prvih 20 s nakon `task_id` → `Failed` (FW-01).
    - `error ≠ 0` u progresu → `Failed` (RPI-04) + preuzimanje `/api/log`.
    - Napredak ne raste 60 s, a nije `Paused` → `Failed` (RPI-05).
-7. **Installing / Done**: kad `transferred_total ≥ length_total > 0` (ili fork `progress_percent == 100`) — stanje `Installing` dok RPI ne javi završetak; za igre `is_exists` potvrđuje instalaciju (polling 2 s, max 10 min) → `Done`. Za update/DLC `Done` čim RPI javi završetak. Tačan signal završetka: **[PROVJERA]**.
-8. Server deregistruje stavku 60 s nakon `Done` (BGFT ponekad ponovi zadnji Range, **[PROVJERA]**), odmah nakon `Cancelled/Failed`.
+7. **Installing / Done**: kad `transferred_total ≥ length_total > 0` (ili fork `progress_percent == 100`) — stanje `Installing` dok RPI ne javi završetak; za igre `is_exists` potvrđuje instalaciju (polling 2 s, max 10 min) → `Done`. Za update/DLC `Done` čim RPI javi završetak. Signal završetka izmjeren 2026-11-21 (Sesija B): ~1 s nakon zadnjeg bajta; zasebna faza instalacije nije potrebna (14.1/4).
+8. Server deregistruje stavku 60 s nakon `Done` (BGFT ponekad ponovi zadnji Range, **[PROVJERA]**; Sesija B nije zabilježila ponavljanje; završeni task ostaje na konzoli, vidi 14.1/11), odmah nakon `Cancelled/Failed`.
 9. Sljedeća stavka. Dok je bilo koja stavka u prenosu, PSPP drži `SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)` da računar ne ode u mirovanje (otpušta se kad red stane).
 
 Pauza: `POST /api/pause_task {"task_id":N}` → `Paused`; "Nastavi" → `resume_task` → `Transferring`. Otkaži: `stop_task` pa `unregister_task` → `Cancelled`; greška u otkazivanju se loguje, stavka ipak postaje `Cancelled` uz upozorenje "konzola možda i dalje ima zadatak u listi preuzimanja". "Zaustavi nakon trenutnog" ne prekida aktivnu stavku. Semantika `stop_task` vs `unregister_task`: **[PROVJERA]**.
@@ -1028,8 +1028,8 @@ Zaseban binary, ne ide u release zip. Uloga: razvoj bez konzole, ručno testiran
   5. 2xx + JSON `status:"success"` → OK;
   6. JSON `status:"fail"` → `RpiFail{error}`;
   7. sve ostalo → `BadResponse(status, body_excerpt)`.
-- Tolerantni brojevi: polje može biti JSON broj, decimalni string ili `"0x…"` hex string (flatz je koristio hex stringove za neke vrijednosti, **[PROVJERA]** za 3.58). `error` može biti broj ili string.
-- `is_exists` odgovor: prihvata `exists` kao bool ili `"true"/"false"`; opciono `size`, `version` ako postoje. **[PROVJERA]** tačna polja.
+- Tolerantni brojevi: polje može biti JSON broj, decimalni string ili `"0x…"` hex string (flatz je koristio hex stringove za neke vrijednosti; 3.58 šalje brojeve kao JSON brojeve uz `*_hex` polja, potvrđeno 2026-11-21, vidi 14.1/3). `error` može biti broj ili string.
+- `is_exists` odgovor: prihvata `exists` kao bool ili `"true"/"false"`; opciono `size`, `version` ako postoje. Potvrđeno 2026-11-21 (Sesija B): `exists` je string, `size` je broj, `version` ne postoji (14.1/1).
 
 ### 9.2 Progress, brzina, ETA
 
@@ -1040,7 +1040,7 @@ Zaseban binary, ne ide u release zip. Uloga: razvoj bez konzole, ručno testiran
 
 ### 9.3 Nastavak nakon restarta
 
-Za `interrupted` stavku sa `task_id`: "Pokušaj ponovo" → `get_task_progress(task_id)`. Ako task postoji i nije završen → `resume_task` (server je ponovo gore, URL-ovi isti jer `item_id` i ime ostaju isti) → `Transferring`. Ako task ne postoji ili vraća grešku → `unregister_task` (ignoriše grešku) i puni tok od 6.2 korak 3. **[PROVJERA]** da li RPI zadržava task nakon prekida i da li `resume_task` nastavlja od offseta.
+Za `interrupted` stavku sa `task_id`: "Pokušaj ponovo" → `get_task_progress(task_id)`. Ako task postoji i nije završen → `resume_task` (server je ponovo gore, URL-ovi isti jer `item_id` i ime ostaju isti) → `Transferring`. Ako task ne postoji ili vraća grešku → `unregister_task` (ignoriše grešku) i puni tok od 6.2 korak 3. Potvrđeno 2026-11-21 (Sesija B, B11): RPI zadržava task nakon prekida, a `resume_task` nastavlja od prenesenog offseta (14.1/12).
 
 ### 9.4 HTTP file server
 
@@ -1049,7 +1049,7 @@ Za `interrupted` stavku sa `task_id`: "Pokušaj ponovo" → `get_task_progress(t
 - Rute: `GET|HEAD /pkg/<item_id>/<safe-name>` i `HEAD /healthz` (samo loopback). Sve ostalo → 404 prazno tijelo. Metode osim GET/HEAD → 405.
 - `<safe-name>`: Content ID (ASCII po formatu) + za split `_<n>`, + `.pkg`, filtrirano na `[A-Za-z0-9._-]`; npr. `/pkg/9f2c41d07ab3e5c1/UP0000-CUSA12345_00-0000000000000000_1.pkg`. Bez query stringa. Lokalno ime fajla i putanja se nikad ne pojavljuju u URL-u ni u odgovoru.
 - Lookup je tačno poklapanje `(item_id, safe-name)` u registry mapi → apsolutna putanja; dijelovi URL-a se nikad ne spajaju sa putanjom fajl-sistema (nema path traversala po konstrukciji).
-- Range: podržano `bytes=a-b`, `bytes=a-`, `bytes=-n`; više opsega u jednom zahtjevu → 416 (BGFT koristi jedan opseg, **[PROVJERA]**). Neispravan/izvan veličine → 416 sa `Content-Range: bytes */<size>`. Bez Range → 200 cijeli fajl. Zaglavlja: `Accept-Ranges: bytes`, `Content-Length` (u64), `Content-Range`, `Content-Type: application/octet-stream`, bez `Server` verzije.
+- Range: podržano `bytes=a-b`, `bytes=a-`, `bytes=-n`; više opsega u jednom zahtjevu → 416 (BGFT koristi jedan `a-b` opseg po zahtjevu, potvrđeno 2026-11-21, vidi 14.1/9). Neispravan/izvan veličine → 416 sa `Content-Range: bytes */<size>`. Bez Range → 200 cijeli fajl. Zaglavlja: `Accept-Ranges: bytes`, `Content-Length` (u64), `Content-Range`, `Content-Type: application/octet-stream`, bez `Server` verzije.
 - Čitanje: `File` + `seek` + `take(len)`, bafer 1 MiB. Ako jedno čitanje sa diska traje > 10 s → upozorenje SRV-04 (prijeti RPI-ov 30 s prekid).
 - Limit 32 istovremene konekcije (atomski brojač); preko limita → 503. Keep-alive dozvoljen.
 - Registry: stavka se registruje pri Starting, deregistruje kako je opisano u 6.2 korak 8; fajl se otvara po zahtjevu (ne drži se lock između zahtjeva). Promjena veličine/mtime fajla tokom prenosa → zatvaranje konekcije + SRV-03.
@@ -1064,7 +1064,7 @@ PS4 PKG zaglavlje je big-endian. Korištena polja (offseti relativno na početak
 | 0x10 | u32 | `entry_count` (0x0C je `file_count`) — potvrđeno desk-provjerom |
 | 0x18 | u32 | offset tabele entry-ja (uvijek čitati, ne pretpostavljati 0x1000) |
 | 0x40 | 36 B ASCII | Content ID (`XXYYYY-CUSAxxxxx_00-ZZZZZZZZZZZZZZZZ`) |
-| 0x430 | u64 | `pkg_size` — ukupna veličina paketa; koristi se za validaciju split grupe (**[PROVJERA]** na stvarnom split paketu da `_0` nosi ukupnu veličinu svih dijelova) |
+| 0x430 | u64 | `pkg_size` — ukupna veličina paketa; koristi se za validaciju split grupe (za 32 nesplit paketa jednak veličini fajla, potvrđeno 2026-11-21 (B3); **[PROVJERA]** na stvarnom split paketu da `_0` nosi ukupnu veličinu svih dijelova) |
 
 Entry tabela: `entry_count` × 32 B: `id u32, filename_offset u32, flags1 u32, flags2 u32, data_offset u32, data_size u32, pad u64`. Traže se `id 0x1000` (param.sfo) i `id 0x1200` (icon0.png). Ako je bit enkripcije `flags1 & 0x80000000` postavljen → entry se tretira kao nedostupan (potvrđeno).
 
@@ -1175,6 +1175,9 @@ Svaka greška ima stabilan kod (koristi se u logu, i18n ključevima i README tro
 | CE-30005-8 | greška čitanja podataka / oštećen paket ili disk | Provjeri integritet paketa; ponovo kopiraj |
 | CE-36329-3 | sistemska greška; kod homebrew paketa često znači da jailbreak/patch za instalaciju nije aktivan | Ponovo pokreni jailbreak pa RPI |
 | CE-32809-2 | aplikacija ne može da se pokrene (posljedica, ne greška instalacije) | Provjeri da je jailbreak aktivan |
+| `0x80990015` | BGFT: instalacija odbijena jer ostaje stari neuspjeli task za isti sadržaj (potvrđeno 2026-11-21, Sesija B) | Obriši stari download u Notifications → Downloads; verzije prije rc.5 ga ostavljaju, rc.5 ga odjavljuje sam pri grešci |
+| `0x80990019` | BGFT: task ne postoji na konzoli, otkazan ili uklonjen (potvrđeno 2026-11-21, Sesija B) | Pokreni instalaciju ponovo |
+| `0x80991404` | Konzola je tražila URL paketa i dobila 404; prije rc.4 server nije ignorisao query string (potvrđeno Sesijom A) | Koristi rc.4 ili noviji |
 | `0x8099xxxx` (porodica) | BGFT greška preuzimanja/instalacije | Prikaži kod; konkretni kodovi se dodaju nakon testiranja (npr. nedovoljno prostora, nedostupan URL, prekid) |
 
 Tabela je proširiva bez promjene logike (dodavanje reda + i18n ključevi). Popunjavanje tačnih BGFT kodova je zadatak testiranja na konzoli.
@@ -1268,27 +1271,27 @@ ps-package-pusher/
 
 ### 14.1 Za provjeru na konzoli (RPI 3.58)
 
-1. Tačan JSON odgovor `is_exists` (ime i tip polja `exists`, da li postoje `size`/`version`).
-2. Da li `is_exists` radi za update i DLC (po Title ID-u igre ili Content ID-u DLC-a) i da li vraća instaliranu verziju.
-3. Tačan JSON `get_task_progress` u 3.58: imena i tipovi polja (broj / decimalni string / hex string), fork polja (`progress_percent`, `transferred_bytes`, ukupna veličina), da li postoje `preparing_percent`/`local_copy_percent`.
-4. Signal završetka: kako se razlikuje "preneseno 100 %" od "instalirano"; da li postoji faza instalacije vidljiva kroz API.
-5. Format polja `error` i konkretni BGFT kodovi za tipične greške (nedovoljno prostora, URL nedostupan, prekid, neispravan paket).
+1. Tačan JSON odgovor `is_exists` (ime i tip polja `exists`, da li postoje `size`/`version`). → potvrđeno 2026-11-21 (Sesija B): `exists` je string `"true"` / `"false"`; `size` je JSON broj (uz `size_hex`); `version` ne postoji. Fixture-i: `tests/fixtures/rpi-3.58/sesija-B-2026-11-21/`.
+2. Da li `is_exists` radi za update i DLC (po Title ID-u igre ili Content ID-u DLC-a) i da li vraća instaliranu verziju. → djelimično 2026-11-21 (Sesija B): nakon instalacije update-a upit po Title ID-u vraća veći `size` bez verzije, pa provjera "update već instaliran" po verziji ne može da se aktivira. DLC nije vidljiv u odgovoru na upit po Title ID-u; upit po Content ID-u nije provjeren.
+3. Tačan JSON `get_task_progress` u 3.58: imena i tipovi polja (broj / decimalni string / hex string), fork polja (`progress_percent`, `transferred_bytes`, ukupna veličina), da li postoje `preparing_percent`/`local_copy_percent`. → potvrđeno 2026-11-21 (Sesija B): brojevi su JSON brojevi, uz njih idu `*_hex` stringovi; postoje `transferred`, `transferred_total`, `transferred_bytes`, `length`, `length_total`, `total`, `progress_percent`, `rest_sec`, `rest_sec_total`, `preparing_percent`, `local_copy_percent`; `error` je `0` kad nema greške. Nepostojeći task vraća `{"status":"fail","error_code":…,"error_code_hex":…}`, a ne `error` (vidi 14.1/5).
+4. Signal završetka: kako se razlikuje "preneseno 100 %" od "instalirano"; da li postoji faza instalacije vidljiva kroz API. → djelimično 2026-11-21 (Sesija B): zasebna faza "Installing" nije bila potrebna; signal "instalirano" stigao je ~1 s nakon zadnjeg bajta. Razlika između "preneseno 100 %" i "instalirano" nije izmjerena posebno.
+5. Format polja `error` i konkretni BGFT kodovi za tipične greške (nedovoljno prostora, URL nedostupan, prekid, neispravan paket). → djelimično 2026-11-21 (Sesija B): viđeni `0x80990015` (install odbijen zbog starog neuspjelog taska, ranije istog dana) i `0x80990019` (task ne postoji, nakon otkaza); `0x80991404` iz Sesije A (URL 404 prije rc.4). Format: `error_code` / `error_code_hex` (vidi 14.1/3). Ostali kodovi (nedovoljno prostora, URL, neispravan paket) nisu izazvani (B15 nije urađen).
 6. Metoda i format `/api/log` (GET/POST, tekst ili JSON, dužina).
 7. Tijela 404 odgovora: uninstall nepostojećeg vs nepoznat endpoint; status za GET na `uninstall_*` (405 ili 404).
 8. Tačna lista endpointa koji provjeravaju `Origin`/`Sec-Fetch-Site`.
-9. Da li BGFT šalje HEAD prije GET-a, koje oblike Range zaglavlja koristi, veličinu komada, broj paralelnih konekcija, ponavlja li zadnji Range nakon završetka.
-10. Split paketi: očekivana konvencija imena, da li samo `_0` ima zaglavlje, da li je redoslijed URL-ova jedini uslov.
-11. Semantika `stop_task` vs `unregister_task`; da li treba `unregister_task` nakon uspješne instalacije.
-12. Da li task preživi prekid PC servera i da li `resume_task` nastavlja od offseta (9.3).
-13. Da li `uninstall_game` čuva save podatke i briše li i update/DLC te igre (tekst dijaloga 4.7 i 4.11).
-13a. Imena polja u tijelu za `uninstall_patch` i `uninstall_ac`; ponašanje kad se deinstalacija pošalje dok traje prenos drugog naslova (6.7).
-14. Ponašanje kad konzola uđe u rest mode tokom prenosa.
+9. Da li BGFT šalje HEAD prije GET-a, koje oblike Range zaglavlja koristi, veličinu komada, broj paralelnih konekcija, ponavlja li zadnji Range nakon završetka. → djelimično 2026-11-21 (Sesija B): nema HEAD zahtjeva. Prvo dva mala Range GET-a za zaglavlje (npr. `bytes=10880-11583`, `bytes=586064-587671`) na odvojenim konekcijama; poslije `install`-a jedan GET `bytes=65536-11010047`, pa uzastopni komadi od tačno 512 MiB (`bytes=11010048-547880959`, …) preko jedne keep-alive konekcije. Offseti preko 4 GB rade. Ponavljanje zadnjeg Range-a nije zabilježeno.
+10. Split paketi: očekivana konvencija imena, da li samo `_0` ima zaglavlje, da li je redoslijed URL-ova jedini uslov. → nije izvedeno 2026-11-21 (Sesija B): split paket nije bio dostupan (B14).
+11. Semantika `stop_task` vs `unregister_task`; da li treba `unregister_task` nakon uspješne instalacije. → djelimično 2026-11-21 (Sesija B): završeni task ostaje registrovan na konzoli i minutama kasnije i dalje javlja 100 %; engine ne zove `unregister_task` nakon uspjeha (samo briše fajl iz lokalnog HTTP registra nakon 60 s). Zaostali završeni task ne blokira reinstalaciju (B9); zaostali neuspjeli task blokira instalaciju sa `0x80990015` (rc.5 ga odjavljuje pri grešci). Otkaz usred prenosa uklanja task sa konzole (B10). Odluka o `unregister_task` nakon uspjeha ostaje otvorena; posljedica su stavke u Downloads listi na konzoli.
+12. Da li task preživi prekid PC servera i da li `resume_task` nastavlja od offseta (9.3). → potvrđeno 2026-11-21 (Sesija B, B11): aplikacija ugašena pri 40 %; nakon ponovnog pokretanja "Pokušaj ponovo" konzola i dalje ima task, a `resume_task` nastavlja sa Range-om `bytes=3772186624-`, tj. tačno od prenesenog offseta.
+13. Da li `uninstall_game` čuva save podatke i briše li i update/DLC te igre (tekst dijaloga 4.7 i 4.11). → nije izvedeno 2026-11-21 (Sesija B skraćena; B7 nije urađen).
+13a. Imena polja u tijelu za `uninstall_patch` i `uninstall_ac`; ponašanje kad se deinstalacija pošalje dok traje prenos drugog naslova (6.7). → nije izvedeno 2026-11-21 (Sesija B skraćena; B12 nije urađen).
+14. Ponašanje kad konzola uđe u rest mode tokom prenosa. → nije izvedeno 2026-11-21 (Sesija B skraćena; B13 nije urađen).
 15. Ograničenja dužine URL-a / dozvoljeni znakovi putanje u RPI-ju.
 
 ### 14.2 Za provjeru u PKG formatu
 
 16. ~~Offset `entry_count` (0x10) i bit enkripcije u `flags1` (0x80000000)~~ — potvrđeno desk-provjerom (PLAN 3).
-17. Ukupna veličina paketa je `pkg_size` u64 @0x430 (desk-provjera); ostaje potvrditi na stvarnom split paketu da `_0` nosi ukupnu veličinu (PLAN S-6).
+17. Ukupna veličina paketa je `pkg_size` u64 @0x430 (desk-provjera); ostaje potvrditi na stvarnom split paketu da `_0` nosi ukupnu veličinu (PLAN S-6). → djelimično 2026-11-21 (Sesija B, B3): za 32 nesplit paketa (10 gd, 4 gp, 18 ac) `pkg_size` @0x430 je jednak veličini fajla na disku. Split paket nije bio dostupan, pa ostaje otvoreno (B14).
 18. Koji SFO ključ nosi verziju za prikaz po kategoriji (`APP_VER` vs `VERSION`). Stvarni `gd` paket (S-6): `APP_VER=01.00`, `VERSION=01.01` — prikazuje se `APP_VER`, `VERSION` u tooltipu; potvrditi za `gp`/`ac`.
 19. Kategorije osim `gd/gp/ac` koje se realno pojavljuju (teme, `gde`, `gdk`) i kako ih RPI instalira.
 
