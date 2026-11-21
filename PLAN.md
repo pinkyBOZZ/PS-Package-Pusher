@@ -1,8 +1,8 @@
 # PS Package Pusher — PLAN izrade
 
-Status: Sesija B (skraćena) završena 2026-11-21, verzija rc.5 · Faze 0–5 završene · Sesija A završena 2026-11-21 · sljedeće: release checklist (sekcija 8) i CP-6 · Datum: 2026-11-21 · Jezik: bosanski (tehnički termini na engleskom)
+Status: Sesija B (skraćena) završena 2026-11-21, RC 0.0.1-rc.5 · Faze 0–6 završene · Sesija A završena 2026-11-21 · CP-6 odobren (odluka vlasnika 2026-11-21) · cilj: `v1.0.0` · sljedeće: release checklist (sekcija 8) · Datum: 2026-11-21 · Jezik: bosanski (tehnički termini na engleskom)
 
-Izvor istine za zahtjeve je `DESIGN.md`; ovaj plan ga ne ponavlja nego referencira sekcije ("DESIGN 6.2"). Plan opisuje put od praznog foldera do javnog GitHub releasea `0.0.1`.
+Izvor istine za zahtjeve je `DESIGN.md`; ovaj plan ga ne ponavlja nego referencira sekcije ("DESIGN 6.2"). Plan opisuje put od praznog foldera do javnog GitHub releasea `1.0.0`.
 
 Veličina zadataka: **S** (mali, jedna cjelina), **M** (nekoliko povezanih dijelova), **L** (veći modul ili više modula). Vremenske procjene se namjerno ne daju.
 
@@ -636,10 +636,10 @@ Ako sesija postane preduga, B13–B16 se mogu odvojiti u kraći drugi dolazak; B
 
 ---
 
-## 8. Release checklista za 0.0.1
+## 8. Release checklista za 1.0.0
 
-- [ ] CP-6 odobren; svi 14.1/14.2 statusi upisani u DESIGN.
-- [ ] `Cargo.toml` verzija `0.0.1`; `CHANGELOG.md` sekcija 0.0.1.
+- [x] CP-6 odobren; svi 14.1/14.2 statusi upisani u DESIGN.
+- [ ] `Cargo.toml` verzija `1.0.0`; `CHANGELOG.md` sekcija 1.0.0.
 - [ ] CI zelen na `main` (fmt, clippy `-D warnings`, test, build release).
 - [ ] Ručna UI matrica (6.4) prođena na finalnom buildu; screenshotovi u `docs/screenshots/` aktuelni.
 - [ ] `README.md` po DESIGN 13.3: screenshotovi dark/light, disclaimer odmah ispod (1.3), zahtjevi, brzi start + firewall, troubleshooting po kodovima, build iz izvora + mock, poznata ograničenja, zasluge (flatz, rawblue33), SmartScreen uputa, SHA256 provjera.
@@ -649,10 +649,10 @@ Ako sesija postane preduga, B13–B16 se mogu odvojiti u kraći drugi dolazak; B
 - [ ] Nema komercijalnih pkg-ova ni lokalnih putanja/korisničkih imena u repou i fixture-ima.
 - [ ] `.github/ISSUE_TEMPLATE/bug_report.md` postoji.
 - [ ] Repo prebačen u **public** (vlasnik).
-- [ ] Tag `v0.0.1` pushan (vlasnik ili agent na izričit OK) → `release.yml` zelen.
-- [ ] Draft release sadrži `PS-Package-Pusher-0.0.1-win-x64.zip` (exe + LICENSE + README + THIRD-PARTY-LICENSES) i `SHA256SUMS.txt`; hash se poklapa sa lokalno izračunatim.
+- [ ] Tag `v1.0.0` pushan (vlasnik, nakon prebacivanja repoa na public) → `release.yml` zelen.
+- [ ] Release sadrži `PS-Package-Pusher-1.0.0-win-x64.zip` (exe + LICENSE + README + THIRD-PARTY-LICENSES) i `SHA256SUMS.txt`; hash se poklapa sa lokalno izračunatim.
 - [ ] Vlasnik preuzme zip na čist Windows (ili Windows Sandbox), pokrene, prođe SmartScreen, dođe do glavnog prozora, Test veze sa konzolom.
-- [ ] Vlasnik ručno objavljuje release.
+- [ ] Release objavljuje `release.yml` automatski (Latest, bez ručnog klika; odluka vlasnika 2026-11-21).
 
 ---
 
@@ -694,7 +694,7 @@ Ako sesija postane preduga, B13–B16 se mogu odvojiti u kraći drugi dolazak; B
 | R20 | Elevirani firewall korak kao sigurnosna površina | niska | visok | fiksni argumenti, samo validiran port, bez shella, samo na klik + UAC (DESIGN 11) | F4 |
 | R21 | Pravo ime/email procuri kroz git historiju ili screenshotove | sred. | sred. | lokalni git identitet prije prvog commita (0.1), provjera u release checklisti | F0, F7 |
 | R9 | > 4 GB test zahtijeva sparse fajl na CI-ju | sred. | niska | `FSCTL_SET_SPARSE`; preskakanje uz poruku; range unit testovi | F1 |
-| R10 | SmartScreen/antivirus lažno označi nepotpisan exe koji otvara server | sred. | sred. | README uputa + SHA256; bez code signinga u 0.0.x (DESIGN 13.2) | F7 |
+| R10 | SmartScreen/antivirus lažno označi nepotpisan exe koji otvara server | sred. | sred. | README uputa + SHA256; bez code signinga u v1.x (DESIGN 13.2) | F7 |
 | R11 | Pravni/brend: Sony simboli, komercijalni sadržaj u repou | niska | visok | test 5.7, ručni pregled, samo sintetički fixture-i, disclaimer | F5, F7 |
 | R12 | Neželjena deinstalacija | niska | visok | uvijek dijalog, default/`Esc` nedestruktivan, test u Fazi 4 | F4 |
 | R13 | Gubitak reda/postavki (oštećen JSON) | niska | sred. | atomski upis, `.broken` kopija, testovi | F1 |
@@ -722,4 +722,4 @@ Sva pitanja su odlučena 2026-11-19:
 | Q7 | Windows 10 | nema okruženja → službeno **samo Windows 11** |
 | Q8 | Upis PKG nalaza u DESIGN | **da**, upisano (DESIGN 9.5, 14.2) |
 
-Trenutno stanje (2026-11-21): Sesija B (skraćena: B1 preskočen, B7/B12/B13/B15/B16 nisu urađeni, B14 nije moguć) završena na RC buildu 0.0.1-rc.5; rezultati u `docs/faza-6-izvjestaj.md`. Sljedeće: release checklist (sekcija 8), CP-6 (odobrenje vlasnika).
+Trenutno stanje (2026-11-21): Sesija B (skraćena: B1 preskočen, B7/B12/B13/B15/B16 nisu urađeni, B14 nije moguć) završena na RC buildu 0.0.1-rc.5; rezultati u `docs/faza-6-izvjestaj.md`. CP-6 odobren (odluka vlasnika 2026-11-21): verzija `1.0.0`; `release.yml` objavljuje stabilni tag automatski kao Latest, pre-release tag ostaje draft; neisprobane stavke (split paketi, čuvanje podataka nakon deinstalacije, rest mode, izvučen kabl/USB disk, ostali tipovi paketa) prihvaćene kao poznata ograničenja; faza `Installing` ostaje kako je. Sljedeće: vlasnik prebacuje repo na public, tag `v1.0.0`, provjera release-a, test na čistom Windowsu.

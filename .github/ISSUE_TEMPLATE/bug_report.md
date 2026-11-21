@@ -8,7 +8,7 @@ labels: bug
 <!-- What you did, what you expected, what happened instead. -->
 
 **Versions**
-- PS Package Pusher: <!-- e.g. 0.0.1 (Settings → bottom, or the exe properties) -->
+- PS Package Pusher: <!-- e.g. 1.0.0 (Settings → bottom, or the exe properties) -->
 - Remote PKG Installer on the console: <!-- e.g. 3.58 -->
 - Console firmware / GoldHEN or HEN: <!-- e.g. 9.00, GoldHEN 2.4 -->
 - Windows: <!-- e.g. Windows 11 24H2 -->

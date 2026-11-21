@@ -1,10 +1,10 @@
 # Changelog
 
-All notable changes to PS Package Pusher. Versions follow `0.0.x` until the first stable release.
+All notable changes to PS Package Pusher. Versions follow Semantic Versioning.
 
-## 0.0.1
+## 1.0.0
 
-First public release (not released yet — waiting for testing on a real console).
+First public release.
 
 - Drag & drop of `.pkg` files and folders, Add files / Add folder; split packages joined automatically.
 - Package details read locally: name, Title ID, version, type (game / update / DLC), game icon.

@@ -8,7 +8,7 @@
 <p align="center">
   <a href="https://github.com/pinkyBOZZ/PS-Package-Pusher/actions/workflows/ci.yml"><img src="https://github.com/pinkyBOZZ/PS-Package-Pusher/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/pinkyBOZZ/PS-Package-Pusher/releases"><img src="https://img.shields.io/github/v/release/pinkyBOZZ/PS-Package-Pusher?include_prereleases&label=release&color=7B2FF7" alt="Release"></a>
-  <img src="https://img.shields.io/badge/status-release%20candidate-FF9E3D" alt="Status: release candidate">
+  <img src="https://img.shields.io/badge/status-stable-2EA043" alt="Status: stable">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-00B4D8" alt="License: MIT"></a>
 </p>
 <p align="center">
@@ -36,10 +36,10 @@
 
 | | |
 |---|---|
-| **Version** | `0.0.1` release candidate — first public release coming soon |
+| **Version** | `1.0.0` — first public release |
 | **Works** | everything in the v1 feature list, tested end-to-end against a mock console |
-| **In progress** | testing on a real PS4 with RPI 3.58 (exact API answers, error codes) |
-| **Next** | `0.0.1` release; ideas for later are collected for v2 |
+| **Tested on a PS4** | RPI 3.58: install of game / update / DLC, packages > 4 GB, pause / resume, cancel, resume after closing the app; see Known limitations below for what was not tested |
+| **Next** | ideas for later versions are collected for v2 |
 
 ## ✨ Features
 
@@ -188,7 +188,7 @@ Console error codes (`CE-…`, `0x8099…`) are explained where known; unknown o
 | Data | **serde_json** | `config.json` and `queue.json` with atomic writes |
 | Fonts / icons | Inter, Audiowide, Phosphor | embedded in the exe |
 | Quality | `cargo test`, clippy `-D warnings`, rustfmt, mock console | 58 automated tests |
-| CI / release | GitHub Actions | tag → build, licenses, zip, SHA-256, draft release |
+| CI / release | GitHub Actions | tag → build, licenses, zip, SHA-256, GitHub release (stable tag: published as Latest; `-` tag: draft pre-release) |
 
 ## 🔧 Building from source
 

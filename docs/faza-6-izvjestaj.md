@@ -62,3 +62,11 @@ Nađeni kodovi konzole: `0x80990015` (install odbijen zbog starog neuspjelog tas
 - **CP-6 (vlasnik):** ovaj izvještaj, DESIGN 14.1/14.2 upisani, odluka o `Installing`, odobrenje ulaska u release fazu.
 - **Release checklist (PLAN sekcija 8):** `Cargo.toml` na 0.0.1 (sada je 0.0.1-rc.5), CHANGELOG 0.0.1, CI, ručna UI matrica na finalnom buildu, README po 13.3, licence, provjera da nema ličnih podataka u repou i fixture-ima.
 - **CP-7 (vlasnik):** go/no-go po checklisti; objava taga `v0.0.1` i draft release-a.
+
+## CP-6 odluke (2026-11-21)
+
+- **Verzija:** prvi javni release je `1.0.0` (ne `0.0.1`). `Cargo.toml` i CHANGELOG su na `1.0.0`.
+- **Objava:** `release.yml` za stabilni tag (bez `-`) objavljuje release automatski kao Latest, bez ručnog klika. Tag sa `-` (npr. `v1.0.1-rc.1`) ostaje draft pre-release.
+- **Poznata ograničenja:** neisprobane stavke se prihvataju kao poznata ograničenja: split paketi, čuvanje podataka nakon deinstalacije, rest mode, izvučen kabl / USB disk i ostali tipovi paketa.
+- **Installing:** faza "Installing" (nakon 100 % engine ispituje `is_exists` za igre dok se instalacija ne potvrdi) ostaje kako je.
+- **Repo:** vlasnik sam prebacuje repo na public prije taga `v1.0.0`.

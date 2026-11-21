@@ -1,6 +1,6 @@
 # PS Package Pusher — DESIGN
 
-Status: nacrt dizajna za v0.0.1 · Datum: 2026-11-19 · Jezik dokumenta: bosanski (tehnički termini na engleskom)
+Status: nacrt dizajna za v1.0.0 (odluka vlasnika 2026-11-21) · Datum: 2026-11-19 · Jezik dokumenta: bosanski (tehnički termini na engleskom)
 
 Oznaka **[PROVJERA]** znači pretpostavku koju treba potvrditi na stvarnoj konzoli (RPI 3.58) ili prototipom, prije nego što se kod oslone na nju. Sve [PROVJERA] stavke su sabrane u sekciji 14.
 
@@ -17,7 +17,7 @@ Princip rada:
 3. PSPP šalje RPI-ju (`http://<IP_konzole>:12801/api/...`) zahtjev za instalaciju sa URL-ovima ka svom serveru.
 4. Konzola (BGFT servis) sama povlači fajl HTTP Range zahtjevima; PSPP prati napredak preko `/api/get_task_progress`.
 
-Distribucija: javni GitHub repo, MIT licenca, verzije `0.0.x` (prvi release `0.0.1`), jedan `.exe` za Windows 11 x64 (službeno podržano i testirano; Windows 10 22H2 "trebalo bi raditi, nije testirano").
+Distribucija: javni GitHub repo, MIT licenca, verzije po Semantic Versioning (prvi stabilni release `1.0.0`, odluka vlasnika 2026-11-21), jedan `.exe` za Windows 11 x64 (službeno podržano i testirano; Windows 10 22H2 "trebalo bi raditi, nije testirano").
 
 ### 1.1 Ciljevi (v1)
 
@@ -317,7 +317,7 @@ Mali prozor bez okvira, centriran na primarnom monitoru, 480×300, zaobljen `rad
 │     ╲    ╲    ╲    │    ╱    ╱    ╱          │   magenta mreža u perspektivi
 │                                              │
 │              PS Package Pusher               │   type.display, text.primary
-│                   v0.0.1                     │   type.caption, text.secondary
+│                   v1.0.0                     │   type.caption, text.secondary
 │                                              │
 │  Pokrećem lokalni server…                    │   type.caption, text.secondary
 │  ━━━━━━━━━━━━━━━━━━━━━━━━──────────────────  │   linija 2 px, progress.fill
@@ -1251,8 +1251,8 @@ ps-package-pusher/
 ### 13.2 GitHub Actions
 
 - **ci.yml** (push, pull_request; `windows-latest`): `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` (unit + integracioni sa mock-om), `cargo build --release`. Keš: `~/.cargo` i `target`.
-- **release.yml** (tag `v0.0.*`): build `--release --bin ps-package-pusher` sa `RUSTFLAGS=-C target-feature=+crt-static`; provjera da se verzija u tagu poklapa sa `Cargo.toml`; zip `PS-Package-Pusher-<ver>-win-x64.zip` = `ps-package-pusher.exe` + `LICENSE` + `README.md` + `THIRD-PARTY-LICENSES.txt` (OFL fontovi, Phosphor MIT, Rust crate licence generisane alatom `cargo-about` ili ručno); `SHA256SUMS.txt`; GitHub Release kao draft (objavljuje se ručno).
-- Bez code signinga u v0.0.x → README objašnjava SmartScreen upozorenje ("More info → Run anyway") i daje SHA256.
+- **release.yml** (tag `v*`): build `--release --bin ps-package-pusher` sa `RUSTFLAGS=-C target-feature=+crt-static`; provjera da se verzija u tagu poklapa sa `Cargo.toml`; zip `PS-Package-Pusher-<ver>-win-x64.zip` = `ps-package-pusher.exe` + `LICENSE` + `README.md` + `THIRD-PARTY-LICENSES.txt` (OFL fontovi, Phosphor MIT, Rust crate licence generisane alatom `cargo-about` ili ručno); `SHA256SUMS.txt`; GitHub Release: stabilni tag (bez `-`, npr. `v1.0.0`) se objavljuje automatski i označava kao Latest; tag sa `-` (npr. `v1.0.1-rc.1`) ostaje draft pre-release (odluka vlasnika 2026-11-21).
+- Bez code signinga u v1.x → README objašnjava SmartScreen upozorenje ("More info → Run anyway") i daje SHA256.
 
 ### 13.3 README (struktura)
 

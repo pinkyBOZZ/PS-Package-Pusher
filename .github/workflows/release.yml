@@ -1,10 +1,10 @@
 name: release
 
-# Tag v0.0.x (or v0.0.x-rc.N) → build, zip, SHA256, draft GitHub release.
-# The owner reviews the draft and publishes it by hand (PLAN 7.1, DESIGN 13.2).
+# Tag vX.Y.Z (e.g. v1.0.0) → build, zip, SHA256, GitHub release marked Latest, published automatically.
+# Tag with a "-" (e.g. v1.0.1-rc.1) → draft pre-release instead, for the owner to review (PLAN 7.1, DESIGN 13.2).
 on:
   push:
-    tags: ["v0.0.*"]
+    tags: ["v*"]
 
 permissions:
   contents: write
@@ -48,13 +48,15 @@ jobs:
           sha256sum "$name.zip" > SHA256SUMS.txt
           cat SHA256SUMS.txt
           echo "ZIP=$name.zip" >> "$GITHUB_ENV"
-      - name: Draft release
+      - name: Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          pre=""
-          case "$VERSION" in *-*) pre="--prerelease" ;; esac
+          case "$VERSION" in
+            *-*) flags="--draft --prerelease" ;;
+            *) flags="--latest" ;;
+          esac
           notes=$(awk -v v="$VERSION" 'index($0, "## " v) == 1 {f=1; next} /^## / {f=0} f' CHANGELOG.md)
-          gh release create "$GITHUB_REF_NAME" "$ZIP" SHA256SUMS.txt --draft $pre \
+          gh release create "$GITHUB_REF_NAME" "$ZIP" SHA256SUMS.txt $flags \
             --title "PS Package Pusher $VERSION" --notes "${notes:-See CHANGELOG.md}"
