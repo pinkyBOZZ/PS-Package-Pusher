@@ -343,6 +343,14 @@ fn stall_fail_code_and_fw01() {
         if code == Code::Rpi04 {
             assert_eq!(err.detail, "0x80990085");
         }
+        assert!(
+            t.mock.tasks().is_empty(),
+            "{name}: stale task left on console"
+        );
+        assert!(
+            t.items.values().all(|i| i.task_id.is_none()),
+            "{name}: task_id kept"
+        );
         t.stop();
     }
 }

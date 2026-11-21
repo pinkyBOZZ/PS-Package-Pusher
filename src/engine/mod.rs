@@ -347,6 +347,11 @@ impl Engine {
             .title(it.title_id.clone())
             .code(report.code)
             .field("task_id", it.task_id.map_or("-".into(), |t| t.to_string()));
+        // a stale task blocks the next install (0x80990015); RPI-07 keeps it to resume
+        if report.code != Code::Rpi07 && self.client.is_some() {
+            self.cancel_task_quietly(i);
+            self.items[i].task_id = None;
+        }
         self.items[i].error = Some(report);
         self.items[i].live = queue::Live::default();
         self.set_state(i, Ev::Error);
