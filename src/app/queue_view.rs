@@ -789,8 +789,14 @@ impl QueueView {
             if let Some(s) = it.live.speed.filter(|_| it.state == State::Transferring) {
                 nums.push((84.0, t.t_args("unit.speed", &[("size", &t.size(s as u64))])));
             }
-            if let Some(e) = it.live.eta.filter(|_| it.state == State::Transferring) {
-                nums.push((76.0, fmt_eta(t, e)));
+            // early estimates (100 h or more) are unreliable and would not fit the column
+            if let Some(e) = it
+                .live
+                .eta
+                .filter(|_| it.state == State::Transferring)
+                .filter(|&e| e.round() < 100.0 * 3600.0)
+            {
+                nums.push((87.0, fmt_eta(t, e)));
             }
             for (w, n) in nums {
                 painter.text(
