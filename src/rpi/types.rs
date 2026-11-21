@@ -258,14 +258,15 @@ mod tests {
         assert!((mid.fraction(0).unwrap() - 0.4).abs() < 1e-9);
         assert!(!mid.complete(0));
 
-        // Known gap: the failure carries `error_code` (0x80990019), which classify does not read
-        // yet, so only the classification is asserted here. See docs/faza-6-izvjestaj.md.
         let gone = include_str!(
             "../../tests/fixtures/rpi-3.58/sesija-B-2026-11-21/progress-unknown-task.json"
         );
-        assert!(matches!(
+        assert_eq!(
             classify(200, gone),
-            Err(RpiError::Fail { status: 200, .. })
-        ));
+            Err(RpiError::Fail {
+                status: 200,
+                error: "0x80990019".into()
+            })
+        );
     }
 }

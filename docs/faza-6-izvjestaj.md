@@ -41,7 +41,7 @@ Nađeni kodovi konzole: `0x80990015` (install odbijen zbog starog neuspjelog tas
 1. **Nema HEAD-a i nema faze "Installing" vidljive kroz API** (DESIGN 5.2, 6.2 korak 7, 14.1/4). Odluka da li se stanje `Installing` ugrađuje ili briše iz DESIGN-a ostaje za CP-6.
 2. **Završeni taskovi ostaju na konzoli.** Konzola ih i dalje prikazuje na 100 % minutama kasnije, a aplikacija ne zove `unregister_task` nakon uspjeha. Stavke ostaju u Downloads listi (vidi README).
 3. **`is_exists` nema `version`.** Dijalog "update već instaliran" (DESIGN 6.2 korak 3) se zato nikad ne pokreće; aplikacija se ponaša kako je dizajnirano za slučaj bez verzije.
-4. **Fail odgovor za task nosi `error_code`, a ne `error`.** Primjer: `{"status":"fail","error_code":-2137456615,"error_code_hex":"0x80990019"}`. `classify` čita samo `error`, pa tekst greške ostaje prazan i kod se ne prikazuje. Parser nije mijenjan u ovoj fazi; test fiksira samo klasifikaciju kao `Fail` (poznat nedostatak, vidi komentar u testu).
+4. **Fail odgovor za task nosi `error_code`, a ne `error`.** Primjer: `{"status":"fail","error_code":-2137456615,"error_code_hex":"0x80990019"}`. `classify` je ranije čitao samo `error`, pa tekst greške ostajao prazan. Popravljeno: `classify` sada čita `error_code_hex` (ili `error_code` kao hex).
 
 ## Nije provjereno / otvoreno
 
@@ -55,7 +55,7 @@ Nađeni kodovi konzole: `0x80990015` (install odbijen zbog starog neuspjelog tas
 
 1. Poziv `unregister_task` nakon uspjeha, da Downloads lista na konzoli ostaje čista.
 2. Upisivanje otkaza u log aplikacije.
-3. Čitanje `error_code` (broj i hex) u `classify` za fail odgovor task-a.
+3. Čitanje `error_code` (broj i hex) u `classify` za fail odgovor task-a. Urađeno (vidi stavku 4 iznad).
 
 ## Put do release-a
 

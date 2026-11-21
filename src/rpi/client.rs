@@ -68,9 +68,19 @@ pub fn classify(status: u16, body: &str) -> Result<Value, RpiError> {
         .ok()
         .filter(|v: &Value| v.get("status").is_some());
     let fail_text = |v: &Value| {
-        v.get("error").map_or_else(String::new, |e| {
+        let text = v.get("error").map_or_else(String::new, |e| {
             e.as_str().map_or_else(|| e.to_string(), str::to_string)
-        })
+        });
+        if !text.is_empty() {
+            return text;
+        }
+        // RPI 3.58 sends error_code / error_code_hex instead of error.
+        if let Some(hex) = v.get("error_code_hex").and_then(Value::as_str) {
+            return hex.to_string();
+        }
+        v.get("error_code")
+            .and_then(Value::as_i64)
+            .map_or_else(String::new, |c| format!("0x{:08X}", c as u32))
     };
     match (status, json) {
         (403, _) => Err(RpiError::Forbidden),
@@ -322,6 +332,23 @@ mod tests {
             Err(RpiError::Fail {
                 status: 200,
                 error: "bad url".into()
+            })
+        );
+        assert_eq!(
+            classify(
+                200,
+                r#"{"status":"fail","error_code":-2137456615,"error_code_hex":"0x80990019"}"#
+            ),
+            Err(RpiError::Fail {
+                status: 200,
+                error: "0x80990019".into()
+            })
+        );
+        assert_eq!(
+            classify(200, r#"{"status":"fail","error_code":-2137456619}"#),
+            Err(RpiError::Fail {
+                status: 200,
+                error: "0x80990015".into()
             })
         );
         assert!(matches!(
