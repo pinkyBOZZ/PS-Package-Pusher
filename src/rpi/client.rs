@@ -2,13 +2,21 @@
 
 use super::types::{Exists, Progress, RpiDialect, num_field};
 use serde_json::{Value, json};
-use std::{net::Ipv4Addr, sync::Mutex, time::Duration};
+use std::{
+    net::Ipv4Addr,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 pub const CALL_TIMEOUT: Duration = Duration::from_secs(5);
 pub const INSTALL_TIMEOUT: Duration = Duration::from_secs(10);
 const BODY_LIMIT: u64 = 1024 * 1024;
 const LOG_LIMIT: u64 = 2 * 1024 * 1024;
+
+/// Outcome of the last exchange with a console, shared by the clients of one engine:
+/// `None` = no exchange yet, `Some(None)` = unreachable, `Some(Some(ms))` = answered in `ms`.
+pub type LastReach = Arc<Mutex<Option<Option<u32>>>>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Unreachable {
@@ -89,6 +97,7 @@ pub struct Client {
     pub dialect: RpiDialect,
     /// Session cache: which `/api/log` method worked.
     log_post: Mutex<Option<bool>>,
+    reach: LastReach,
 }
 
 /// Raw exchange, for the log (DESIGN 7.8: bodies truncated to 2 KB by the logger).
@@ -115,7 +124,14 @@ impl Client {
             base: format!("http://{ip}:{port}"),
             dialect,
             log_post: Mutex::new(None),
+            reach: LastReach::default(),
         }
+    }
+
+    /// Records this client's exchanges in a shared cell instead of a private one.
+    pub fn with_reach(mut self, reach: LastReach) -> Self {
+        self.reach = reach;
+        self
     }
 
     fn send(
@@ -144,6 +160,7 @@ impl Client {
                 .build()
                 .call()
         };
+        let started = Instant::now();
         let out = match res {
             Ok(mut r) => {
                 let status = r.status().as_u16();
@@ -154,6 +171,12 @@ impl Client {
             }
             Err(e) => Err(map_err(e)),
         };
+        // any HTTP answer (even a 403 or RPI fail) proves the console is there
+        let reach = match &out {
+            Err(RpiError::Unreachable(_)) => None,
+            _ => Some(started.elapsed().as_millis() as u32),
+        };
+        *self.reach.lock().unwrap_or_else(|e| e.into_inner()) = Some(reach);
         let ex = Exchange {
             path: path.to_string(),
             request: req_s,

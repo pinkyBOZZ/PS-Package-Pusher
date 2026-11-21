@@ -30,6 +30,7 @@ struct T {
     asked: Vec<String>,
     installed: Vec<(String, Result<bool, String>)>,
     uninstalled: Vec<(String, Result<bool, Code>)>,
+    console: Vec<Option<u32>>,
     dir: PathBuf,
     join: Option<std::thread::JoinHandle<()>>,
 }
@@ -105,6 +106,7 @@ fn start_port(dir: PathBuf, mock: Mock, persist: bool, server_port: u16) -> T {
         asked: vec![],
         installed: vec![],
         uninstalled: vec![],
+        console: vec![],
         dir,
         join: Some(h.join),
     }
@@ -125,6 +127,7 @@ impl T {
                     self.order.retain(|x| *x != id);
                 }
                 Event::Order(o) => self.order = o,
+                Event::ConsoleStatus(s) => self.console.push(s),
                 Event::AskDecision(id) => self.asked.push(id),
                 Event::InstalledResult { target, result } => {
                     self.installed.push((target.id, result))
@@ -546,5 +549,19 @@ fn decision_apply_to_all() {
         t.state("A") == Some(State::Skipped) && t.state("B") == Some(State::Skipped)
     });
     assert_eq!(t.asked.len(), 1);
+    t.stop();
+}
+
+#[test]
+fn console_status_sent_on_change_only() {
+    let mut t = start("console", MockConfig::default(), false);
+    let d = t.dir.clone();
+    let ok = pkg(&d, "ok.pkg", Fixture::game("CUSA00060"));
+    t.add(vec![ok], 1);
+    t.wait("console status", |t| !t.console.is_empty());
+    t.tx.send(Command::StartQueue).unwrap();
+    t.wait("done", |t| t.items.values().all(|i| i.state == State::Done));
+    // many RPI calls, one report: the console stayed reachable
+    assert!(matches!(t.console.as_slice(), [Some(_)]), "{:?}", t.console);
     t.stop();
 }

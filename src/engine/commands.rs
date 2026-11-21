@@ -75,6 +75,9 @@ pub enum Event {
     AskDecision(String),
     Banner(Option<Banner>),
     ServerStatus(Option<SocketAddrV4>),
+    /// Console after an RPI call: `Some(ms)` = answered, `None` = unreachable. Sent only when
+    /// that changes (connected or not), never on every call.
+    ConsoleStatus(Option<u32>),
     QueueRunning(bool),
     /// One-off info line (duplicates, skipped non-pkg files), already in the log too.
     Info(String),

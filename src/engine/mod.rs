@@ -9,7 +9,7 @@ use crate::{
     logging::Logger,
     net,
     pkg::{self, Kind, PkgError, scan},
-    rpi::{Client, RpiDialect, RpiError, UninstallKind},
+    rpi::{Client, LastReach, RpiDialect, RpiError, UninstallKind},
     server::{self, Server, ServerEvent, registry},
     storage, winapi,
 };
@@ -133,6 +133,10 @@ struct Engine {
     server_rx: Option<Receiver<ServerEvent>>,
     allowed: Arc<Mutex<Vec<Ipv4Addr>>>,
     client: Option<Client>,
+    /// Reachability of the console, written by every client of this engine.
+    reach: LastReach,
+    /// Last `ConsoleStatus` sent.
+    reported_reach: Option<Option<u32>>,
     dirty_since: Option<Instant>,
     dereg: Vec<(Instant, String)>,
     pending_batches: HashMap<u64, Vec<String>>,
@@ -178,6 +182,8 @@ impl Engine {
             server_rx: None,
             allowed: Arc::new(Mutex::new(Vec::new())),
             client: None,
+            reach: LastReach::default(),
+            reported_reach: None,
             dirty_since: None,
             dereg: Vec::new(),
             pending_batches: HashMap::new(),
@@ -397,11 +403,10 @@ impl Engine {
             return false;
         };
         if self.client.is_none() {
-            self.client = Some(Client::new(
-                console,
-                self.o.config.console_port,
-                self.o.dialect.clone(),
-            ));
+            self.client = Some(
+                Client::new(console, self.o.config.console_port, self.o.dialect.clone())
+                    .with_reach(self.reach.clone()),
+            );
         }
         if self.server.is_none() {
             let pc = match self
@@ -457,6 +462,9 @@ impl Engine {
 
     fn drop_connection(&mut self) {
         self.client = None;
+        // the next console starts from scratch
+        *self.reach.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        self.reported_reach = None;
         self.server_rx = None;
         if self.server.take().is_some() {
             self.emit(Event::ServerStatus(None));
@@ -487,6 +495,7 @@ impl Engine {
                 self.command(cmd);
             }
             self.tick();
+            self.report_console();
         }
         self.shutdown();
     }
@@ -827,13 +836,14 @@ impl Engine {
         if jobs.is_empty() {
             return;
         }
-        let (port, dialect, tx) = (
+        let (port, dialect, tx, reach) = (
             self.o.config.console_port,
             self.o.dialect.clone(),
             self.self_tx.clone(),
+            self.reach.clone(),
         );
         thread::spawn(move || {
-            let c = Client::new(ip, port, dialect);
+            let c = Client::new(ip, port, dialect).with_reach(reach);
             for (id, title) in jobs {
                 match c.is_exists(&title).0 {
                     Ok(e) => {
@@ -849,8 +859,10 @@ impl Engine {
     }
 
     fn background_client(&self) -> Option<Client> {
-        self.console()
-            .map(|ip| Client::new(ip, self.o.config.console_port, self.o.dialect.clone()))
+        self.console().map(|ip| {
+            Client::new(ip, self.o.config.console_port, self.o.dialect.clone())
+                .with_reach(self.reach.clone())
+        })
     }
 
     /// `is_exists` off the engine thread; DLC is checked by its Content ID ([PROVJERA] 14.1/2).
@@ -1092,6 +1104,22 @@ impl Engine {
         {
             self.save_now();
         }
+    }
+
+    /// Sends `ConsoleStatus` when the console turns reachable or unreachable; no polling, only
+    /// the outcome of calls the engine already makes.
+    fn report_console(&mut self) {
+        let Some(last) = *self.reach.lock().unwrap_or_else(|e| e.into_inner()) else {
+            return;
+        };
+        if self
+            .reported_reach
+            .is_some_and(|r| r.is_some() == last.is_some())
+        {
+            return;
+        }
+        self.reported_reach = Some(last);
+        self.emit(Event::ConsoleStatus(last));
     }
 
     fn server_events(&mut self) {

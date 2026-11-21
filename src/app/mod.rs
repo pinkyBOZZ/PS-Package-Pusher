@@ -146,14 +146,20 @@ impl App {
             }
         }
         let cfg_firewall_shown = cfg.firewall_notice_shown;
+        let t = I18n::new(Lang::from_code(&cfg.language));
+        let mut settings = SettingsView::new(&cfg);
+        // one connection test at startup, so the header shows the console state (DESIGN 3)
+        if cfg.console_ip().is_some() {
+            settings.start_test(&cc.egui_ctx, cfg.clone(), None, &t);
+        }
         let (loaded_tx, loaded_rx) = mpsc::channel();
         let splash_state = cfg
             .splash_enabled
             .then(|| splash::Splash::new(cc.egui_ctx.input(|i| i.time), &cfg, loaded_rx));
         Self {
             theme: theme::ThemeState::default(),
-            t: I18n::new(Lang::from_code(&cfg.language)),
-            settings: SettingsView::new(&cfg),
+            t,
+            settings,
             cfg,
             data_dir,
             log,
@@ -226,6 +232,9 @@ impl App {
                     self.banner = b;
                 }
                 Event::ServerStatus(s) => self.server = s,
+                Event::ConsoleStatus(s) => {
+                    self.reach = Some(s.map_or(Reach::Unreachable, Reach::Ok))
+                }
                 Event::QueueRunning(r) => self.running = r,
                 Event::Info(msg) => self.queue.info(msg, now),
                 Event::AskDecision(id) => self.dialogs.decision = Some(id),
@@ -862,6 +871,14 @@ impl eframe::App for App {
                                     .send(Command::ApplySettings(Box::new(self.cfg.clone())));
                                 if lang_changed {
                                     self.t = I18n::new(Lang::from_code(&self.cfg.language));
+                                }
+                                if self.cfg.console_ip().is_some() {
+                                    self.settings.start_test(
+                                        &ctx,
+                                        self.cfg.clone(),
+                                        self.server,
+                                        &self.t,
+                                    );
                                 }
                             }
                             // language applies immediately, even before Save (DESIGN 4.5)

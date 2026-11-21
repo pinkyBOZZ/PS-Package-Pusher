@@ -3,5 +3,5 @@
 pub mod client;
 pub mod types;
 
-pub use client::{Client, RpiError, UninstallKind, Unreachable};
+pub use client::{Client, LastReach, RpiError, UninstallKind, Unreachable};
 pub use types::{Exists, Progress, RpiDialect};
