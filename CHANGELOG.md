@@ -2,6 +2,12 @@
 
 All notable changes to PS Package Pusher. Versions follow Semantic Versioning.
 
+## 1.0.1
+
+### Fixed
+
+- Opening Settings (or the firewall notice) no longer shows an empty PowerShell window for a few seconds while the firewall rule is checked.
+
 ## 1.0.0
 
 First public release.

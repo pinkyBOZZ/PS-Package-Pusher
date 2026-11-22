@@ -4,7 +4,9 @@
 //! `--firewall add <port>` / `--firewall remove`, which runs `netsh` (no shell) and exits.
 
 use serde_json::Value;
-use std::{path::PathBuf, process::Command};
+use std::{os::windows::process::CommandExt, path::PathBuf, process::Command};
+// The GUI process has no console, so Windows would open a visible one for each child.
+use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
 pub const RULE: &str = "PS Package Pusher";
 const ERROR_CANCELLED: u32 = 1223;
@@ -28,6 +30,7 @@ fn netsh(args: &[String]) -> (i32, String) {
     match Command::new("netsh")
         .args(["advfirewall", "firewall"])
         .args(args)
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
     {
         Ok(o) => (
@@ -162,6 +165,7 @@ pub fn status() -> Result<Status, String> {
     );
     let out = Command::new("powershell")
         .args(["-NoProfile", "-NonInteractive", "-Command", &ps])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| e.to_string())?;
     parse_status(&String::from_utf8_lossy(&out.stdout))
