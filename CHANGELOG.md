@@ -2,6 +2,18 @@
 
 All notable changes to PS Package Pusher. Versions follow Semantic Versioning.
 
+## 1.0.2
+
+### Changed
+
+- A finished install is now removed from the PS4 Downloads list (Notifications → Downloads) about a minute after it completes, so the list no longer fills up.
+- The app version and a link to the GitHub releases are shown at the bottom of Settings.
+- Cancelling an install is now written to the log.
+
+### Fixed
+
+- In a narrow window the Pause / Cancel buttons no longer overlap the progress numbers; the ETA (and if needed the speed) is hidden when there is no room.
+
 ## 1.0.1
 
 ### Fixed

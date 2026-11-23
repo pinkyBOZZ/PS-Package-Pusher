@@ -1031,6 +1031,14 @@ impl Engine {
 
     fn cancel(&mut self, i: usize) {
         let st = self.items[i].state;
+        self.o
+            .log
+            .info("engine", "cancelled")
+            .title(self.items[i].title_id.clone())
+            .field(
+                "task_id",
+                self.items[i].task_id.map_or("-".into(), |t| t.to_string()),
+            );
         if let (Some(task), Some(c)) = (self.items[i].task_id, &self.client) {
             for op in ["stop_task", "unregister_task"] {
                 if let Err(e) = c.task(op, task).0 {
@@ -1063,15 +1071,14 @@ impl Engine {
 
     fn tick(&mut self) {
         let now = Instant::now();
-        let reg = self.registry.clone();
-        self.dereg.retain(|(at, id)| {
-            if *at <= now {
-                reg.unregister(id);
-                false
-            } else {
-                true
-            }
-        });
+        let (due, later): (Vec<_>, Vec<_>) = std::mem::take(&mut self.dereg)
+            .into_iter()
+            .partition(|(at, _)| *at <= now);
+        self.dereg = later;
+        for (_, id) in due {
+            self.registry.unregister(&id);
+            self.dereg_console(&id);
+        }
         self.server_events();
         if self.running && self.active.is_none() {
             if let Some(i) = self.items.iter().position(|it| it.state == State::Queued) {
@@ -1165,6 +1172,28 @@ impl Engine {
             let _ = c.task("stop_task", task);
             let _ = c.task("unregister_task", task);
         }
+    }
+
+    /// Removes a finished install's task from the console's download list (dereg_delay after confirm).
+    fn dereg_console(&mut self, id: &str) {
+        let Some(i) = self.idx(id) else { return };
+        let it = &self.items[i];
+        let (Some(task), State::Done, Some(c)) = (it.task_id, it.state, self.client.as_ref())
+        else {
+            return;
+        };
+        if let Err(e) = c.task("unregister_task", task).0 {
+            self.o
+                .log
+                .warn(
+                    "engine",
+                    format!("unregister_task failed; the console may still list the task: {e}"),
+                )
+                .title(self.items[i].title_id.clone());
+        }
+        self.items[i].task_id = None;
+        self.upsert(i);
+        self.dirty();
     }
 
     fn step(&mut self, i: usize) {
@@ -1504,6 +1533,8 @@ impl Engine {
                 .title(self.items[i].title_id.clone());
             self.set_state(i, Ev::Confirmed);
             let id = self.items[i].id.clone();
+            // the console finishes its own install step first, so wait dereg_delay before unregistering
+            // shortcut: tasks finished <60 s before exit stay on the console, unregister on next start if users report it
             self.dereg
                 .push((Instant::now() + self.o.timings.dereg_delay, id));
             self.active = None;

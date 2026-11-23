@@ -36,10 +36,10 @@
 
 | | |
 |---|---|
-| **Version** | `1.0.0` — first public release |
+| **Version** | see [Releases](../../releases); the app shows its version at the bottom of Settings |
 | **Works** | everything in the v1 feature list, tested end-to-end against a mock console |
-| **Tested on a PS4** | RPI 3.58: install of game / update / DLC, packages > 4 GB, pause / resume, cancel, resume after closing the app; see Known limitations below for what was not tested |
-| **Next** | ideas for later versions are collected for v2 |
+| **Tested on a PS4** | RPI 3.58, with two PCs and three different PS4 consoles: install of game / update / DLC, packages > 4 GB, pause / resume, cancel, resume after closing the app; see Known limitations below for what was not tested |
+| **Next** | 1.1: Windows notifications when an install finishes or fails |
 
 ## ✨ Features
 
@@ -172,7 +172,7 @@ Console error codes (`CE-…`, `0x8099…`) are explained where known; unknown o
 - Remote PKG Installer has no "list installed titles" API, so uninstall works on items in the queue or on a typed Title ID / Content ID.
 - Some RPI 3.58 behaviour is not confirmed yet (whether reinstalling keeps save data); the app tolerates both known variants of the JSON fields.
 - Not tested on a console yet: split packages, save data after uninstall, rest mode during a transfer, a pulled network cable or removed USB disk during a transfer, and package types other than game, update and DLC.
-- Finished downloads stay in the PS4 Downloads list (Notifications → Downloads); remove them there by hand.
+- A finished install is removed from the PS4 Downloads list about a minute after it completes. If you close the app within that minute, that entry stays; remove it in Notifications → Downloads.
 - One console at a time; HTTP only on the local network (RPI does not support HTTPS).
 
 ## 🧰 Tech stack

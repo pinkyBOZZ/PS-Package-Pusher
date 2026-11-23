@@ -33,6 +33,7 @@ struct T {
     console: Vec<Option<u32>>,
     dir: PathBuf,
     join: Option<std::thread::JoinHandle<()>>,
+    log: Logger,
 }
 
 fn timings() -> EngineTimings {
@@ -86,13 +87,14 @@ fn start_port(dir: PathBuf, mock: Mock, persist: bool, server_port: u16) -> T {
         ..Default::default()
     };
     let (etx, erx) = mpsc::channel();
+    let log = Logger::memory();
     let h = engine::spawn(
         EngineOptions {
             data_dir: persist.then(|| dir.join("data")),
             config,
             timings: timings(),
             dialect: RpiDialect::default(),
-            log: Logger::memory(),
+            log: log.clone(),
         },
         etx,
         Arc::new(|| {}),
@@ -109,6 +111,7 @@ fn start_port(dir: PathBuf, mock: Mock, persist: bool, server_port: u16) -> T {
         console: vec![],
         dir,
         join: Some(h.join),
+        log,
     }
 }
 
@@ -276,7 +279,8 @@ fn already_installed_skip_and_reinstall() {
     })
     .unwrap();
     t.wait("B reinstalled", |t| t.state("B") == Some(State::Done));
-    assert!(t.mock.tasks().len() == 1, "only B was installed");
+    // <= 1: the finished task may already be unregistered (dereg_delay)
+    assert!(t.mock.tasks().len() <= 1, "only B was installed");
     t.stop();
 }
 
@@ -391,6 +395,28 @@ fn pause_resume_cancel() {
         t.mock.tasks().is_empty(),
         "task unregistered on the console"
     );
+    let cancels = t
+        .log
+        .entries()
+        .iter()
+        .filter(|e| e.msg == "cancelled")
+        .count();
+    assert_eq!(cancels, 1, "one cancel log line");
+    t.stop();
+}
+
+#[test]
+fn finished_install_task_leaves_console() {
+    let mut t = start("dereg", MockConfig::default(), false);
+    let d = t.dir.clone();
+    let p = pkg(&d, "g.pkg", Fixture::game("CUSA00050"));
+    t.add(vec![p], 1);
+    let id = t.items.keys().next().unwrap().clone();
+    t.tx.send(Command::StartQueue).unwrap();
+    t.wait("done", |t| t.items[&id].state == State::Done);
+    t.wait("console task removed", |t| {
+        t.mock.tasks().is_empty() && t.items[&id].task_id.is_none()
+    });
     t.stop();
 }
 
@@ -433,7 +459,8 @@ fn restart_resumes_interrupted_task() {
     t2.tx.send(Command::Retry(id.clone())).unwrap();
     t2.tx.send(Command::StartQueue).unwrap();
     t2.wait("done after resume", |t| t.items[&id].state == State::Done);
-    assert_eq!(t2.mock.tasks().len(), 1, "no second install task");
+    // <= 1: the finished task may already be unregistered (dereg_delay)
+    assert!(t2.mock.tasks().len() <= 1, "no second install task");
     t2.stop();
 }
 

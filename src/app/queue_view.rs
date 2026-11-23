@@ -73,6 +73,19 @@ pub fn fmt_eta(t: &I18n, secs: f64) -> String {
     }
 }
 
+/// How many leading number columns fit before `limit`; each is `w` wide and followed by a 10 px gap.
+fn fitting_columns(mut px: f32, widths: &[f32], limit: f32) -> usize {
+    let mut n = 0;
+    for w in widths {
+        if px + w > limit {
+            break;
+        }
+        px += w + 10.0;
+        n += 1;
+    }
+    n
+}
+
 pub fn state_style(p: &Palette, s: State) -> (Color32, &'static str) {
     use State::*;
     match s {
@@ -798,6 +811,27 @@ impl QueueView {
             {
                 nums.push((87.0, fmt_eta(t, e)));
             }
+            // reserve the buttons' width first (Cancel + Pause/Resume, widest label of the language),
+            // so the numbers drop before the buttons instead of running under them
+            let btn_w = |icon_s: &str, label: &str, pad: f32| {
+                let g = painter.layout_job(fonts::job(
+                    icon_s,
+                    label,
+                    fonts::semibold(size::BODY),
+                    Color32::WHITE,
+                ));
+                (g.size().x + pad * 2.0).max(32.0)
+            };
+            let pause_w = [t.t("act.pause"), t.t("act.pausing"), t.t("act.resume")]
+                .iter()
+                .map(|l| btn_w(icon::PAUSE, l, 14.0))
+                .fold(0.0, f32::max);
+            let actions_w = btn_w(icon::PROHIBIT, &t.t("act.cancel"), 8.0)
+                + cui.spacing().item_spacing.x
+                + pause_w;
+            let actions_left = right_col + 4.0 - actions_w;
+            let widths: Vec<f32> = nums.iter().map(|(w, _)| *w).collect();
+            nums.truncate(fitting_columns(px, &widths, actions_left - 10.0));
             for (w, n) in nums {
                 painter.text(
                     pos2(px + w, draw.top() + 56.0),
@@ -1094,4 +1128,29 @@ pub fn dropped(ctx: &egui::Context) -> (Vec<PathBuf>, usize) {
             i.raw.hovered_files.len(),
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fitting_columns;
+
+    // numbers start at px 456 (after status, bar); columns 44 / 84 / 87 px, 10 px gaps
+    const COLS: [f32; 3] = [44.0, 84.0, 87.0];
+
+    #[test]
+    fn min_width_880_drops_eta_only() {
+        // right_col 832, buttons ~170 px: limit = 832 + 4 - 170 - 10 = 656; speed ends at 594, ETA at 691
+        assert_eq!(fitting_columns(456.0, &COLS, 656.0), 2);
+    }
+
+    #[test]
+    fn width_1100_keeps_all_columns() {
+        // right_col 1052: limit = 1052 + 4 - 170 - 10 = 876
+        assert_eq!(fitting_columns(456.0, &COLS, 876.0), 3);
+    }
+
+    #[test]
+    fn narrower_limit_drops_speed_too() {
+        assert_eq!(fitting_columns(456.0, &COLS, 590.0), 1);
+    }
 }

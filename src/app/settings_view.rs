@@ -482,6 +482,27 @@ impl SettingsView {
                     }
                 });
                 widgets::space(ui, 4);
+                // ui.hyperlink does nothing here: egui-winit's `webbrowser` feature is off
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 0.0;
+                    ui.label(
+                        RichText::new(format!(
+                            "PS Package Pusher {} · ",
+                            env!("CARGO_PKG_VERSION")
+                        ))
+                        .size(size::CAPTION)
+                        .color(p.text_secondary),
+                    );
+                    if ui
+                        .link(RichText::new("GitHub").size(size::CAPTION))
+                        .clicked()
+                    {
+                        let _ = std::process::Command::new("explorer")
+                            .arg("https://github.com/pinkyBOZZ/PS-Package-Pusher/releases")
+                            .spawn();
+                    }
+                });
+                widgets::space(ui, 4);
             });
         saved
     }
