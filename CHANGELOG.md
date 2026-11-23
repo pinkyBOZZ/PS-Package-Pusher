@@ -2,6 +2,13 @@
 
 All notable changes to PS Package Pusher. Versions follow Semantic Versioning.
 
+## 1.1.0
+
+### Added
+
+- Windows notifications: when an install fails and when the queue finishes ("3 installed, 1 failed"), shown only while the app is in the background. Clicking the notification or the tray icon brings the app back.
+- Settings → "Windows notifications" (on by default). While it is on, the app shows an icon in the system tray.
+
 ## 1.0.2
 
 ### Changed

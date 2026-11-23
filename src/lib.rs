@@ -13,4 +13,5 @@ pub mod pkg;
 pub mod rpi;
 pub mod server;
 pub mod storage;
+pub mod tray;
 pub mod winapi;

@@ -18,6 +18,7 @@ pub struct Config {
     pub pc_ip_override: Option<String>,
     pub language: String,
     pub splash_enabled: bool,
+    pub notifications_enabled: bool,
     pub firewall_notice_shown: bool,
     pub window: Option<WindowState>,
 }
@@ -41,6 +42,7 @@ impl Default for Config {
             pc_ip_override: None,
             language: "en".into(),
             splash_enabled: true,
+            notifications_enabled: true,
             firewall_notice_shown: false,
             window: None,
         }
@@ -123,6 +125,7 @@ mod tests {
         let (c, i) = load(&d);
         assert_eq!(c.server_port, 9000);
         assert_eq!(c.console_port, 12801);
+        assert!(c.notifications_enabled); // missing in old files: default on
         assert_eq!(c.console_ip, None);
         assert_eq!(i, vec![LoadIssue::InvalidConsoleIp("ps4.local".into())]);
 

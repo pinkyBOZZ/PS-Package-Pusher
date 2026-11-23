@@ -4,6 +4,7 @@ pub mod anim;
 pub mod dialogs;
 pub mod fonts;
 pub mod log_view;
+pub mod notify;
 pub mod queue_view;
 pub mod settings_view;
 pub mod splash;
@@ -80,6 +81,8 @@ pub struct App {
     queue_loaded: Option<mpsc::Sender<()>>,
     /// Debug-only override for screenshots (`--theme light|dark`); the app follows Windows otherwise.
     force_theme: Option<bool>,
+    tray: Option<crate::tray::Tray>,
+    notes: notify::Tracker,
 }
 
 use log_view::LogView;
@@ -147,6 +150,10 @@ impl App {
         }
         let cfg_firewall_shown = cfg.firewall_notice_shown;
         let t = I18n::new(Lang::from_code(&cfg.language));
+        let tray = cfg
+            .notifications_enabled
+            .then(|| new_tray(&cc.egui_ctx))
+            .flatten();
         let mut settings = SettingsView::new(&cfg);
         // one connection test at startup, so the header shows the console state (DESIGN 3)
         if cfg.console_ip().is_some() {
@@ -197,17 +204,26 @@ impl App {
             } else {
                 None
             },
+            tray,
+            notes: notify::Tracker::default(),
         }
     }
 
-    fn drain_events(&mut self, now: f64) {
+    fn drain_events(&mut self, ctx: &egui::Context, now: f64) {
         while let Ok(e) = self.events.try_recv() {
             match e {
                 Event::ItemUpsert(i) => {
+                    let prev = self.items.get(&i.id).map(|x| x.state);
+                    let title = i.title.clone().unwrap_or_else(|| i.title_id.clone());
+                    let code = i.error.as_ref().map(|r| r.code.as_str());
+                    let note = self.notes.on_item_state(prev, i.state, &title, code);
                     if !self.order.contains(&i.id) {
                         self.order.push(i.id.clone());
                     }
                     self.items.insert(i.id.clone(), *i);
+                    if let Some(n) = note {
+                        self.notify(ctx, n);
+                    }
                 }
                 Event::ItemRemoved(id) => {
                     if let (Some(ix), Some(item)) = (
@@ -235,7 +251,12 @@ impl App {
                 Event::ConsoleStatus(s) => {
                     self.reach = Some(s.map_or(Reach::Unreachable, Reach::Ok))
                 }
-                Event::QueueRunning(r) => self.running = r,
+                Event::QueueRunning(r) => {
+                    self.running = r;
+                    if let Some(n) = self.notes.on_queue_running(r) {
+                        self.notify(ctx, n);
+                    }
+                }
                 Event::Info(msg) => self.queue.info(msg, now),
                 Event::AskDecision(id) => self.dialogs.decision = Some(id),
                 Event::InstalledResult { target, result } => {
@@ -257,6 +278,41 @@ impl App {
                 }
             }
         }
+    }
+
+    /// Windows notification for a failure or a finished queue; only while the window is not focused.
+    fn notify(&self, ctx: &egui::Context, note: notify::Note) {
+        let Some(tray) = self.tray.as_ref() else {
+            return;
+        };
+        if ctx.input(|i| i.viewport().focused) == Some(true) {
+            return;
+        }
+        let (title, body, error) = match note {
+            notify::Note::Failed { title, code } => {
+                let body = match code {
+                    Some(code) => self
+                        .t
+                        .t_args("notify.failed.body", &[("title", &title), ("code", &code)]),
+                    None => title,
+                };
+                (self.t.t("notify.failed.title"), body, true)
+            }
+            notify::Note::QueueDone { done, failed } => {
+                let mut parts = Vec::new();
+                if done > 0 {
+                    parts.push(self.t.plural("notify.queue.installed", done));
+                }
+                if failed > 0 {
+                    parts.push(
+                        self.t
+                            .t_args("notify.queue.failed", &[("n", &failed.to_string())]),
+                    );
+                }
+                (self.t.t("notify.queue.title"), parts.join(", "), failed > 0)
+            }
+        };
+        tray.notify(&title, &body, error);
     }
 
     /// "Transfer in progress" confirmation on window close (DESIGN 4.10).
@@ -704,7 +760,7 @@ impl eframe::App for App {
         let ctx = ui.ctx().clone();
         self.frames += 1;
         let now = ctx.input(|i| i.time);
-        self.drain_events(now);
+        self.drain_events(&ctx, now);
         if let Some(s) = self.splash.as_mut() {
             if s.ui(ui, &self.t) {
                 if let Some(w) = s.warning.take() {
@@ -872,6 +928,11 @@ impl eframe::App for App {
                                 if lang_changed {
                                     self.t = I18n::new(Lang::from_code(&self.cfg.language));
                                 }
+                                self.tray = if self.cfg.notifications_enabled {
+                                    self.tray.take().or_else(|| new_tray(&ctx))
+                                } else {
+                                    None
+                                };
                                 if self.cfg.console_ip().is_some() {
                                     self.settings.start_test(
                                         &ctx,
@@ -927,6 +988,16 @@ impl eframe::App for App {
         }
         self.log.info("app", "exit");
     }
+}
+
+/// Tray icon for notifications; a click brings the window back. None if Windows refuses (the app still works).
+fn new_tray(ctx: &egui::Context) -> Option<crate::tray::Tray> {
+    let ctx = ctx.clone();
+    crate::tray::Tray::new(move || {
+        ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+        ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+        ctx.request_repaint();
+    })
 }
 
 /// Native file/folder picker on its own thread so the UI never blocks (DESIGN 6.1, 7.3).

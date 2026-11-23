@@ -61,6 +61,7 @@ pub struct Draft {
     pub server_port: String,
     pub language: String,
     pub splash: bool,
+    pub notifications: bool,
 }
 
 impl Draft {
@@ -73,6 +74,7 @@ impl Draft {
             server_port: c.server_port.to_string(),
             language: c.language.clone(),
             splash: c.splash_enabled,
+            notifications: c.notifications_enabled,
         }
     }
 
@@ -100,6 +102,7 @@ impl Draft {
             pc_ip_override: pc,
             language: self.language.clone(),
             splash_enabled: self.splash,
+            notifications_enabled: self.notifications,
             ..base.clone()
         })
     }
@@ -415,6 +418,7 @@ impl SettingsView {
                             });
                     });
                     ui.checkbox(&mut self.draft.splash, t.t("settings.splash"));
+                    ui.checkbox(&mut self.draft.notifications, t.t("settings.notifications"));
                     ui.horizontal(|ui| {
                         ui.add_sized(
                             [180.0, 24.0],
