@@ -233,8 +233,12 @@ fn success_split_order_and_persistence() {
     });
     assert_eq!(t.mock.installed(), ["CUSA00001"]);
     assert!(t.by_title("Test Game CUSA00001").live.fraction == Some(1.0));
-    let saved = std::fs::read_to_string(d.join("data").join(engine::QUEUE_FILE)).unwrap();
-    assert_eq!(saved.matches("\"state\": \"done\"").count(), 3, "{saved}");
+    // queue.json is written with a debounce, so wait for the last save instead of reading at once
+    let file = d.join("data").join(engine::QUEUE_FILE);
+    let done3 = |f: &std::path::Path| {
+        std::fs::read_to_string(f).is_ok_and(|s| s.matches("\"state\": \"done\"").count() == 3)
+    };
+    t.wait("queue saved", |_| done3(&file));
     t.stop();
 }
 
