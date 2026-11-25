@@ -8,7 +8,7 @@ use crate::{
     errors::{Code, ErrorReport, find_console_codes},
     logging::Logger,
     net,
-    pkg::{self, Kind, PkgError, scan},
+    pkg::{self, CONTENT_LICENSE_ONLY, Kind, PkgError, scan},
     rpi::{Client, LastReach, RpiDialect, RpiError, UninstallKind},
     server::{self, Server, ServerEvent, registry},
     storage, winapi,
@@ -752,6 +752,19 @@ impl Engine {
                 }
                 let mut it = Item::from_info(id.clone(), parts, &info);
                 it.note = note;
+                if info.content_type == CONTENT_LICENSE_ONLY {
+                    // the console's download service refuses these: never queue them for the network
+                    self.o
+                        .log
+                        .warn(
+                            "engine",
+                            "license-only DLC cannot be installed over the network",
+                        )
+                        .code(Code::Pkg08)
+                        .title(info.title_id.clone());
+                    it.state = State::Invalid;
+                    it.error = Some(ErrorReport::new(Code::Pkg08, String::new()));
+                }
                 self.items[i] = it;
             }
             Err(report) => {

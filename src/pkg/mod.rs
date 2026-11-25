@@ -5,4 +5,4 @@ pub mod header;
 pub mod scan;
 pub mod sfo;
 
-pub use header::{Icon, Kind, PkgError, PkgInfo, read_info};
+pub use header::{CONTENT_LICENSE_ONLY, Icon, Kind, PkgError, PkgInfo, read_info};

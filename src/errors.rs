@@ -20,7 +20,7 @@ codes! {
     Fw01 = "FW-01", Fw02 = "FW-02", Fw03 = "FW-03", Fw04 = "FW-04",
     Srv01 = "SRV-01", Srv02 = "SRV-02", Srv03 = "SRV-03", Srv04 = "SRV-04",
     Rpi01 = "RPI-01", Rpi02 = "RPI-02", Rpi04 = "RPI-04", Rpi05 = "RPI-05", Rpi06 = "RPI-06", Rpi07 = "RPI-07", Rpi08 = "RPI-08",
-    Pkg01 = "PKG-01", Pkg02 = "PKG-02", Pkg03 = "PKG-03", Pkg04 = "PKG-04", Pkg05 = "PKG-05", Pkg06 = "PKG-06", Pkg07 = "PKG-07",
+    Pkg01 = "PKG-01", Pkg02 = "PKG-02", Pkg03 = "PKG-03", Pkg04 = "PKG-04", Pkg05 = "PKG-05", Pkg06 = "PKG-06", Pkg07 = "PKG-07", Pkg08 = "PKG-08",
 }
 
 impl std::fmt::Display for Code {
@@ -91,6 +91,11 @@ pub const CONSOLE_CODES: &[ConsoleCode] = &[
         code: "CE-32809-2",
         key: "ce32809",
         verified: false,
+    },
+    ConsoleCode {
+        code: "0x80990004",
+        key: "bgft80990004",
+        verified: true,
     },
     ConsoleCode {
         code: "0x80990015",

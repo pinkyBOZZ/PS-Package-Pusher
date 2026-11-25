@@ -152,6 +152,7 @@ Every error has a code; the app shows the full explanation (and the console log 
 | `PKG-05` | This package is already in the queue (#<pos>). | No action needed. |
 | `PKG-06` | Unknown package type <category>. | Installing is possible at your own risk. |
 | `PKG-07` | The file changed or disappeared after it was added. | Remove the item and add it again. |
+| `PKG-08` | This DLC only unlocks content (no data) and cannot be installed over the network. | Copy the .pkg to a USB drive and install it on the console with Package Installer (GoldHEN or Debug Settings). |
 | `RPI-01` | The console refused the installation: <detail> | See the console log in the details. If the detail is `0x80990015`, an old download of this package is still on the console (older builds could leave it): delete it in Notifications → Downloads and try again. |
 | `RPI-02` | Checking whether the title is installed failed. | Nothing is installed without this check. Try again. |
 | `RPI-04` | Download/installation was aborted, code <detail>. | See the code explanation and the console log. |
@@ -175,6 +176,7 @@ Console error codes (`CE-…`, `0x8099…`) are explained where known; unknown o
 - Not tested on a console yet: split packages, save data after uninstall, rest mode during a transfer, a pulled network cable or removed USB disk during a transfer, and package types other than game, update, DLC and homebrew app (for example themes).
 - A finished install is removed from the PS4 Downloads list about a minute after it completes. If you close the app within that minute, that entry stays; remove it in Notifications → Downloads.
 - One console at a time; HTTP only on the local network (RPI does not support HTTPS).
+- License-only DLCs (unlock keys, about 128 KB) cannot be installed over the network: the console refuses them. The app marks them as `PKG-08`; install them from USB with Package Installer.
 
 ## 🧰 Tech stack
 

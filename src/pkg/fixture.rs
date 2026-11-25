@@ -17,6 +17,8 @@ pub struct Fixture {
     pub version: String,
     pub encrypt_sfo: bool,
     pub with_icon: bool,
+    /// Written to @0x74 (0x1A game and update, 0x1B DLC with data, 0x1C license-only DLC; seen on real packages).
+    pub content_type: u32,
     /// Total package size written to @0x430 and used for the file length (≥ header bytes).
     pub total_size: u64,
 }
@@ -35,15 +37,19 @@ impl Fixture {
             version: app_ver.into(),
             encrypt_sfo: false,
             with_icon: true,
+            content_type: 0x1B,
             total_size: 0,
         }
     }
     pub fn game(tid: &str) -> Self {
-        Self::new(tid, "gd", "01.00", "GAME")
+        let mut f = Self::new(tid, "gd", "01.00", "GAME");
+        f.content_type = 0x1A;
+        f
     }
     pub fn update(tid: &str, ver: &str) -> Self {
         let mut f = Self::new(tid, "gp", ver, "PATCH");
         f.title = format!("Test Game {tid} Update");
+        f.content_type = 0x1A;
         f
     }
     pub fn dlc(tid: &str) -> Self {
@@ -91,6 +97,7 @@ impl Fixture {
 
         let mut b = vec![0u8; end];
         b[0..4].copy_from_slice(&super::header::MAGIC.to_be_bytes());
+        b[0x74..0x78].copy_from_slice(&self.content_type.to_be_bytes());
         let entries: Vec<(u32, u32, usize, usize)> = [
             Some((
                 super::header::ID_SFO,

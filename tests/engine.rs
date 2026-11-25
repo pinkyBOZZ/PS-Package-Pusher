@@ -10,7 +10,7 @@ use pspp::{
     errors::Code,
     logging::Logger,
     mock::{Mock, MockConfig},
-    pkg::fixture::Fixture,
+    pkg::{fixture::Fixture, header::CONTENT_LICENSE_ONLY},
     rpi::{RpiDialect, UninstallKind},
 };
 use std::{
@@ -494,6 +494,25 @@ fn invalid_inputs() {
     std::thread::sleep(Duration::from_millis(200));
     t.pump();
     assert_eq!(t.items.len(), 3);
+    t.stop();
+}
+
+#[test]
+fn license_only_dlc_is_invalid_and_never_sent() {
+    let mut t = start("license", MockConfig::default(), false);
+    let d = t.dir.clone();
+    let mut f = Fixture::dlc("CUSA00070");
+    f.content_type = CONTENT_LICENSE_ONLY;
+    let p = pkg(&d, "lic.pkg", f);
+    t.add(vec![p], 1);
+    let id = t.items.keys().next().unwrap().clone();
+    assert_eq!(t.items[&id].state, State::Invalid);
+    assert_eq!(t.items[&id].error.as_ref().unwrap().code, Code::Pkg08);
+    t.tx.send(Command::StartQueue).unwrap();
+    std::thread::sleep(Duration::from_millis(200));
+    t.pump();
+    assert_eq!(t.items[&id].state, State::Invalid);
+    assert!(t.mock.tasks().is_empty() && t.installed.is_empty());
     t.stop();
 }
 

@@ -46,6 +46,7 @@ fn dump(path: &str) -> Result<(), String> {
         .to_string();
     let pkg_size = u64::from_be_bytes(h[0x430..0x438].try_into().unwrap());
     println!("file_count   {file_count}\nentry_count  {entry_count}\nentry_table  0x{table:X}");
+    println!("content_type 0x{:X}", be32(&h, 0x74));
     println!(
         "content_id   {content_id}\npkg_size     {pkg_size} (file on disk {file_len}{})",
         if pkg_size == file_len {

@@ -14,6 +14,8 @@ const HEADER_LEN: usize = 0x438;
 const MAX_ENTRIES: u32 = 10_000;
 pub const MAX_ICON: usize = 4 * 1024 * 1024;
 pub const MAX_ICON_DIM: u32 = 1024;
+/// Content type of a license-only DLC (unlock keys, no data): the console refuses it over the network.
+pub const CONTENT_LICENSE_ONLY: u32 = 0x1C;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Kind {
@@ -53,6 +55,8 @@ pub struct PkgInfo {
     pub version: Option<String>,
     /// u64 @0x430: total package size.
     pub pkg_size: u64,
+    /// u32 BE @0x74: content type (0x1B DLC with data, 0x1C license-only DLC).
+    pub content_type: u32,
     pub icon: Option<Icon>,
     /// PKG-03: param.sfo missing or encrypted; Title ID came from the Content ID.
     pub sfo_missing: bool,
@@ -143,6 +147,7 @@ pub fn read_info_from<R: Read + Seek>(r: &mut R, len: u64) -> Result<PkgInfo, Pk
         .trim_end_matches('\0')
         .to_string();
     let pkg_size = u64::from_be_bytes(h[0x430..0x438].try_into().expect("8 bytes"));
+    let content_type = be32(&h, 0x74);
     let t = read_at(r, len, table, entry_count as usize * 32)?;
 
     let (mut sfo_e, mut icon_e) = (None, None);
@@ -189,6 +194,7 @@ pub fn read_info_from<R: Read + Seek>(r: &mut R, len: u64) -> Result<PkgInfo, Pk
         app_ver: get("APP_VER"),
         version: get("VERSION"),
         pkg_size,
+        content_type,
         icon,
         sfo_missing,
         content_id_mismatch,
@@ -288,6 +294,15 @@ mod tests {
             }
             let _ = info(&b);
         }
+    }
+
+    #[test]
+    fn content_type_at_0x74() {
+        let d = info(&Fixture::dlc("CUSA00005").bytes()).unwrap();
+        assert_eq!(d.content_type, 0x1B);
+        let mut f = Fixture::dlc("CUSA00005");
+        f.content_type = CONTENT_LICENSE_ONLY;
+        assert_eq!(info(&f.bytes()).unwrap().content_type, CONTENT_LICENSE_ONLY);
     }
 
     #[test]
