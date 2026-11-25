@@ -176,7 +176,7 @@ Console error codes (`CE-…`, `0x8099…`) are explained where known; unknown o
 - Not tested on a console yet: split packages, save data after uninstall, rest mode during a transfer, a pulled network cable or removed USB disk during a transfer, and package types other than game, update, DLC and homebrew app (for example themes).
 - A finished install is removed from the PS4 Downloads list about a minute after it completes. If you close the app within that minute, that entry stays; remove it in Notifications → Downloads.
 - One console at a time; HTTP only on the local network (RPI does not support HTTPS).
-- License-only DLCs (unlock keys, about 128 KB) cannot be installed over the network: the console refuses them. The app marks them as `PKG-08`; install them from USB with Package Installer.
+- License-only DLCs (unlock keys, usually under 1 MB) cannot be installed over the network: the console refuses them. The app marks them as `PKG-08`; install them from USB with Package Installer.
 
 ## 🧰 Tech stack
 

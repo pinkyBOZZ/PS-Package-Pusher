@@ -6,7 +6,7 @@ All notable changes to PS Package Pusher. Versions follow Semantic Versioning.
 
 ### Fixed
 
-- Small license-only DLCs (unlock keys without data, about 128 KB) failed with RPI-01 0x80990004, because the console refuses them over the network. The app now recognizes them when they are added, marks them as `PKG-08` without sending them to the console, and explains how to install them from USB with Package Installer.
+- Small license-only DLCs (unlock keys without data, usually under 1 MB) failed with RPI-01 0x80990004, because the console refuses them over the network. The app now recognizes them when they are added, marks them as `PKG-08` without sending them to the console, and explains how to install them from USB with Package Installer.
 - The console error 0x80990004 now has an explanation in the error details.
 
 ## 1.1.0
